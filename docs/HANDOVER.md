@@ -224,7 +224,8 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 - 트리거: `push` to `main`
 - `npm ci` 후 `.env.sevensplit-wbs-dashboard`에 시크릿으로 토큰+DB ID 기록
 - `google-github-actions/auth@v2` + `FIREBASE_SERVICE_ACCOUNT`
-- `firebase deploy --only hosting,auth`
+- `firebase deploy --only hosting` (SSR Function은 Hosting에 묶여 같이 올라감)
+- **`auth`는 CD에서 빼 둠.** Google 로그인은 이미 프로비저닝됨. CD 서비스 계정은 `serviceusage.services.enable`이 없어 `--only auth`가 실패함.
 - **`FIREBASE_TOKEN`은 쓰지 않음.** `firebase login:ci` 불필요.
 
 이미 있는 GitHub Secrets:

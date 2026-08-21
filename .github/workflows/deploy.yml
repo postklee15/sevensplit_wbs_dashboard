@@ -32,4 +32,4 @@ jobs:
       - name: Deploy to Firebase Hosting
         run: |
           npx -y firebase-tools@latest experiments:enable webframeworks
-          npx -y firebase-tools@latest deploy --only hosting,auth --project sevensplit-wbs-dashboard --non-interactive --force
+          npx -y firebase-tools@latest deploy --only hosting --project sevensplit-wbs-dashboard --non-interactive --force
