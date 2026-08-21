@@ -6,9 +6,11 @@ import { WbsCalendar } from "@/components/WbsCalendar";
 import {
   UNASSIGNED,
   WEEKLY_CAPACITY,
+  addDays,
   buildPersonRows,
   filterTasks,
   loadBand,
+  parseYmd,
   remainingEffort,
   servicesOf,
   summary,
@@ -18,6 +20,13 @@ import {
 } from "@/lib/metrics";
 
 type ViewMode = "load" | "month" | "week";
+type LoadWeekIndex = 0 | 1 | 2;
+
+const LOAD_WEEK_TABS: { index: LoadWeekIndex; label: string }[] = [
+  { index: 0, label: "이번주" },
+  { index: 1, label: "다음주" },
+  { index: 2, label: "다다음주" },
+];
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -29,6 +38,12 @@ function fmt(n: number, digits = 1): string {
 function shortWeek(start: string): string {
   const [, m, d] = start.split("-");
   return `${Number(m)}/${Number(d)}`;
+}
+
+function weekSpan(monday: string): string {
+  const start = parseYmd(monday);
+  const end = addDays(start, 4);
+  return `${start.getMonth() + 1}/${start.getDate()}–${end.getMonth() + 1}/${end.getDate()}`;
 }
 
 function dateRange(task: Task): string {
@@ -58,6 +73,7 @@ export function Dashboard({
   const [person, setPerson] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("load");
+  const [loadWeek, setLoadWeek] = useState<LoadWeekIndex>(0);
 
   const scoped = useMemo(
     () =>
@@ -75,6 +91,18 @@ export function Dashboard({
   const rows = useMemo(() => buildPersonRows(scoped, today, weeks), [scoped, today, weeks]);
   const totals = useMemo(() => summary(rows), [rows]);
   const services = useMemo(() => servicesOf(payload.tasks), [payload.tasks]);
+
+  const peopleLoad = useMemo(() => {
+    return rows
+      .filter((row) => row.name !== UNASSIGNED)
+      .map((row) => ({ row, load: row.weeklyLoad[loadWeek] ?? 0 }))
+      .sort((a, b) => {
+        const delta = b.load - a.load;
+        if (Math.abs(delta) > 0.01) return delta;
+        return b.row.remainingDays - a.row.remainingDays;
+      });
+  }, [rows, loadWeek]);
+  const weekOverCount = peopleLoad.filter((item) => loadBand(item.load) === "over").length;
 
   const visibleTasks = useMemo(
     () =>
@@ -99,7 +127,7 @@ export function Dashboard({
   });
 
   return (
-    <main className={`shell ${view !== "load" ? "wide" : ""}`}>
+    <main className="shell wide">
       <header className="top">
         <div>
           <p className="kicker">Split Invest · {payload.databaseTitle}</p>
@@ -297,39 +325,8 @@ export function Dashboard({
         </table>
       </div>
 
-      <section className="people-grid">
-        <div className="panel">
-          <h2>이번 주 부하 순위 · 용량 {WEEKLY_CAPACITY}인일</h2>
-          <div className="person-list">
-            {rows
-              .filter((row) => row.name !== UNASSIGNED)
-              .map((row) => {
-                const load = row.weeklyLoad[0];
-                const band = loadBand(load);
-                return (
-                  <button
-                    key={row.name}
-                    type="button"
-                    className={`person ${person === row.name ? "on" : ""}`}
-                    onClick={() => setPerson(person === row.name ? null : row.name)}
-                  >
-                    <div>
-                      <b>{row.name}</b>
-                      <div className="meta">
-                        미완료 {row.open} · 초과 {row.overdue}
-                      </div>
-                    </div>
-                    <div className={`bar ${band}`}>
-                      <i style={{ width: `${Math.min(100, (load / WEEKLY_CAPACITY) * 100)}%` }} />
-                    </div>
-                    <div className="num">{fmt(load)}</div>
-                  </button>
-                );
-              })}
-          </div>
-        </div>
-
-        <div className="panel">
+      <section className="load-stack">
+        <div className="panel tasks-panel">
           <h2>
             작업 목록
             {person ? ` · ${person}` : ""}
@@ -385,6 +382,53 @@ export function Dashboard({
                 </tbody>
               </table>
             )}
+          </div>
+        </div>
+
+        <div className="panel rank-panel">
+          <div className="panel-head">
+            <h2>인원별 부하 현황 · 용량 {WEEKLY_CAPACITY}인일</h2>
+            <div className="view-switch" role="tablist" aria-label="주간">
+              {LOAD_WEEK_TABS.map((tab) => (
+                <button
+                  key={tab.index}
+                  className={`chip ${loadWeek === tab.index ? "on" : ""}`}
+                  type="button"
+                  role="tab"
+                  aria-selected={loadWeek === tab.index}
+                  onClick={() => setLoadWeek(tab.index)}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <p className="hint" style={{ padding: "8px 16px 0" }}>
+            {weekSpan(weeks[loadWeek] ?? weeks[0])} · 선택한 주에 배분된 공수 · 과부하 {weekOverCount}명
+          </p>
+          <div className="person-list">
+            {peopleLoad.map(({ row, load }) => {
+              const band = loadBand(load);
+              return (
+                <button
+                  key={row.name}
+                  type="button"
+                  className={`person ${person === row.name ? "on" : ""}`}
+                  onClick={() => setPerson(person === row.name ? null : row.name)}
+                >
+                  <div>
+                    <b>{row.name}</b>
+                    <div className="meta">
+                      미완료 {row.open} · 초과 {row.overdue}
+                    </div>
+                  </div>
+                  <div className={`bar ${band}`}>
+                    <i style={{ width: `${Math.min(100, (load / WEEKLY_CAPACITY) * 100)}%` }} />
+                  </div>
+                  <div className="num">{load < 0.05 ? "—" : fmt(load)}</div>
+                </button>
+              );
+            })}
           </div>
         </div>
       </section>
