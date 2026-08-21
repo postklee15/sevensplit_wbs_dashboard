@@ -3,6 +3,7 @@
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { DashboardPayload, Task } from "@/lib/types";
+import { WbsCalendar } from "@/components/WbsCalendar";
 import {
   UNASSIGNED,
   WEEKLY_CAPACITY,
@@ -16,6 +17,8 @@ import {
   todayKst,
   weekStarts,
 } from "@/lib/metrics";
+
+type ViewMode = "load" | "month" | "week";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -45,6 +48,7 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
   const [service, setService] = useState<string | null>(null);
   const [person, setPerson] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<ViewMode>("load");
 
   const scoped = useMemo(
     () =>
@@ -86,7 +90,7 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
   });
 
   return (
-    <main className="shell">
+    <main className={`shell ${view !== "load" ? "wide" : ""}`}>
       <header className="top">
         <div>
           <p className="kicker">Split Invest · {payload.databaseTitle}</p>
@@ -96,6 +100,29 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
           </p>
         </div>
         <div className="controls">
+          <div className="view-switch" role="tablist" aria-label="보기">
+            <button
+              className={`chip ${view === "load" ? "on" : ""}`}
+              type="button"
+              onClick={() => setView("load")}
+            >
+              부하
+            </button>
+            <button
+              className={`chip ${view === "month" ? "on" : ""}`}
+              type="button"
+              onClick={() => setView("month")}
+            >
+              월력
+            </button>
+            <button
+              className={`chip ${view === "week" ? "on" : ""}`}
+              type="button"
+              onClick={() => setView("week")}
+            >
+              주력
+            </button>
+          </div>
           <input
             placeholder="작업명, 이슈 검색"
             value={query}
@@ -144,6 +171,11 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
             {name}
           </button>
         ))}
+        {person ? (
+          <button className="chip on" type="button" onClick={() => setPerson(null)}>
+            담당자 {person} ×
+          </button>
+        ) : null}
       </section>
 
       <section className="kpis">
@@ -169,13 +201,25 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
         </article>
       </section>
 
-      {totals.unassignedOpen > 0 ? (
+      {totals.unassignedOpen > 0 && view === "load" ? (
         <p className="hint" style={{ marginTop: -12, marginBottom: 20 }}>
           담당자가 없는 미완료 작업 {totals.unassignedOpen}건이 있습니다. 표에서 “(미지정)”을 누르면
           목록을 볼 수 있습니다.
         </p>
       ) : null}
 
+      {view !== "load" ? (
+        <WbsCalendar
+          tasks={visibleTasks}
+          today={today}
+          mode={view}
+          person={person}
+          onSelectPerson={(name) => setPerson(person === name ? null : name)}
+        />
+      ) : null}
+
+      {view === "load" ? (
+        <>
       <div className="section-head">
         <h2>주간 부하 히트맵</h2>
         <div className="legend">
@@ -325,6 +369,8 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
           </div>
         </div>
       </section>
+        </>
+      ) : null}
     </main>
   );
 }

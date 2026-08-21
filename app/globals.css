@@ -435,7 +435,8 @@ table.tasks {
 
 @media (max-width: 980px) {
   .kpis,
-  .people-grid {
+  .people-grid,
+  .cal-side {
     grid-template-columns: 1fr;
   }
 
@@ -443,4 +444,213 @@ table.tasks {
     flex-direction: column;
     align-items: flex-start;
   }
+}
+
+.view-switch {
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  background: var(--paper-2);
+  border-radius: 999px;
+}
+
+.view-switch .chip {
+  border-color: transparent;
+  background: transparent;
+}
+
+.view-switch .chip.on {
+  background: var(--ink);
+  border-color: var(--ink);
+}
+
+.cal-nav {
+  display: flex;
+  gap: 6px;
+}
+
+.calendar-block {
+  margin-top: 4px;
+}
+
+.cal-board {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  margin: 12px 0 20px;
+}
+
+.cal-weekdays,
+.cal-daynums {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cal-weekdays {
+  border-bottom: 1px solid var(--line);
+  background: var(--paper-2);
+}
+
+.cal-weekdays > div,
+.cal-weekhead {
+  padding: 10px 8px;
+  font-size: 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.cal-weekhead {
+  all: unset;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  padding: 10px 4px;
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.cal-weekhead strong {
+  font-size: 18px;
+  color: var(--ink);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-weekhead.today strong,
+.cal-daynum.today span {
+  background: var(--ink);
+  color: var(--paper);
+  border-radius: 999px;
+  padding: 0 7px;
+}
+
+.cal-weekhead.selected,
+.cal-daynum.selected {
+  background: #f4e6d4;
+}
+
+.cal-week {
+  border-top: 1px solid var(--line);
+  padding-bottom: 8px;
+}
+
+.cal-daynum {
+  all: unset;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 8px 8px 4px;
+  cursor: pointer;
+  font-variant-numeric: tabular-nums;
+}
+
+.cal-daynum.out {
+  color: #b7ad9c;
+}
+
+.cal-daynum em,
+.cal-weekhead em {
+  font-style: normal;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.cal-lanes {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 3px 6px;
+  padding: 0 6px 6px;
+  min-height: 28px;
+}
+
+.week-lanes {
+  padding: 10px 8px 16px;
+}
+
+.cal-event {
+  display: block;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 22px;
+  height: 22px;
+  padding: 0 8px;
+  text-decoration: none;
+  border-left: 3px solid var(--line);
+  background: #efe7d8;
+}
+
+.week-lanes .cal-event {
+  height: 36px;
+  line-height: 1.25;
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-size: 12px;
+  padding: 3px 8px;
+}
+
+.cal-event:hover {
+  outline: 1px solid var(--ink);
+}
+
+.cal-event.기한초과 {
+  background: #fbe8e4;
+  border-left-color: var(--over);
+}
+
+.cal-event.진행중 {
+  background: #f8ead6;
+  border-left-color: var(--busy);
+}
+
+.cal-event.예정 {
+  background: #eef5e4;
+  border-left-color: var(--ok);
+}
+
+.cal-event.완료 {
+  background: #efe7d8;
+  color: var(--muted);
+}
+
+.cal-side {
+  display: grid;
+  grid-template-columns: 1.3fr 0.9fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.cal-tasklist {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0 0 12px;
+  max-height: 360px;
+  overflow: auto;
+}
+
+.cal-tasklist li {
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid var(--line);
+  align-items: start;
+}
+
+.inline-person {
+  all: unset;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.shell.wide {
+  max-width: 1360px;
 }
