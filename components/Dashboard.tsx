@@ -1,0 +1,336 @@
+"use client";
+
+import { useMemo, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import type { DashboardPayload, Task } from "@/lib/types";
+import {
+  UNASSIGNED,
+  WEEKLY_CAPACITY,
+  buildPersonRows,
+  filterTasks,
+  loadBand,
+  remainingEffort,
+  servicesOf,
+  summary,
+  taskStatus,
+  todayKst,
+  weekStarts,
+} from "@/lib/metrics";
+
+function fmt(n: number, digits = 1): string {
+  return n.toLocaleString("ko-KR", {
+    maximumFractionDigits: digits,
+    minimumFractionDigits: n < 10 && digits > 0 ? 1 : 0,
+  });
+}
+
+function shortWeek(start: string): string {
+  const [, m, d] = start.split("-");
+  return `${Number(m)}/${Number(d)}`;
+}
+
+function dateRange(task: Task): string {
+  if (!task.start) return "—";
+  if (!task.end || task.end === task.start) return task.start.slice(5).replace("-", "/");
+  return `${task.start.slice(5).replace("-", "/")}–${task.end.slice(5).replace("-", "/")}`;
+}
+
+export function Dashboard({ payload }: { payload: DashboardPayload }) {
+  const router = useRouter();
+  const [pending, startTransition] = useTransition();
+  const today = todayKst();
+  const weeks = useMemo(() => weekStarts(today), [today]);
+  const [leafOnly, setLeafOnly] = useState(true);
+  const [hideDone, setHideDone] = useState(true);
+  const [service, setService] = useState<string | null>(null);
+  const [person, setPerson] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const scoped = useMemo(
+    () =>
+      filterTasks(payload.tasks, {
+        leafOnly,
+        service,
+        person: null,
+        hideDone: false,
+        query: "",
+        today,
+      }),
+    [payload.tasks, leafOnly, service, today],
+  );
+
+  const rows = useMemo(() => buildPersonRows(scoped, today, weeks), [scoped, today, weeks]);
+  const totals = useMemo(() => summary(rows), [rows]);
+  const services = useMemo(() => servicesOf(payload.tasks), [payload.tasks]);
+
+  const visibleTasks = useMemo(
+    () =>
+      filterTasks(payload.tasks, {
+        leafOnly,
+        service,
+        person,
+        hideDone,
+        query,
+        today,
+      }).sort((a, b) => {
+        const order = { 기한초과: 0, 진행중: 1, 예정: 2, 일정없음: 3, 완료: 4 };
+        const d = order[taskStatus(a, today)] - order[taskStatus(b, today)];
+        if (d !== 0) return d;
+        return (a.start ?? "9999").localeCompare(b.start ?? "9999");
+      }),
+    [payload.tasks, leafOnly, service, person, hideDone, query, today],
+  );
+
+  const fetched = new Date(payload.fetchedAt).toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+  });
+
+  return (
+    <main className="shell">
+      <header className="top">
+        <div>
+          <p className="kicker">Split Invest · {payload.databaseTitle}</p>
+          <h1>담당자별 리소스 현황</h1>
+          <p className="sub">
+            하위 작업 공수 기준 · 주 용량 {WEEKLY_CAPACITY}인일 · {today} 기준 · {fetched} 동기화
+          </p>
+        </div>
+        <div className="controls">
+          <input
+            placeholder="작업명, 이슈 검색"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+          />
+          <button
+            className={`chip ${leafOnly ? "on" : ""}`}
+            onClick={() => setLeafOnly((v) => !v)}
+            type="button"
+          >
+            하위 작업만
+          </button>
+          <button
+            className={`chip ${hideDone ? "on" : ""}`}
+            onClick={() => setHideDone((v) => !v)}
+            type="button"
+          >
+            완료 숨김
+          </button>
+          <button
+            className="btn"
+            type="button"
+            disabled={pending}
+            onClick={() => startTransition(() => router.refresh())}
+          >
+            {pending ? "새로고침 중" : "노션 다시 읽기"}
+          </button>
+        </div>
+      </header>
+
+      <section className="chips" aria-label="서비스 필터">
+        <button
+          className={`chip ${service === null ? "on" : ""}`}
+          type="button"
+          onClick={() => setService(null)}
+        >
+          전체 서비스
+        </button>
+        {services.map((name) => (
+          <button
+            key={name}
+            className={`chip ${service === name ? "on" : ""}`}
+            type="button"
+            onClick={() => setService(name === service ? null : name)}
+          >
+            {name}
+          </button>
+        ))}
+      </section>
+
+      <section className="kpis">
+        <article className="kpi">
+          <div className="label">담당자</div>
+          <div className="value">{totals.people}</div>
+        </article>
+        <article className="kpi">
+          <div className="label">미완료 작업</div>
+          <div className="value">{totals.open}</div>
+        </article>
+        <article className={`kpi ${totals.overdue ? "warn" : ""}`}>
+          <div className="label">기한 초과</div>
+          <div className="value">{totals.overdue}</div>
+        </article>
+        <article className="kpi">
+          <div className="label">잔여 공수 (인일)</div>
+          <div className="value">{fmt(totals.remaining)}</div>
+        </article>
+        <article className={`kpi ${totals.thisWeekOver ? "warn" : ""}`}>
+          <div className="label">이번 주 과부하</div>
+          <div className="value">{totals.thisWeekOver}명</div>
+        </article>
+      </section>
+
+      {totals.unassignedOpen > 0 ? (
+        <p className="hint" style={{ marginTop: -12, marginBottom: 20 }}>
+          담당자가 없는 미완료 작업 {totals.unassignedOpen}건이 있습니다. 표에서 “(미지정)”을 누르면
+          목록을 볼 수 있습니다.
+        </p>
+      ) : null}
+
+      <div className="section-head">
+        <h2>주간 부하 히트맵</h2>
+        <div className="legend">
+          <span>
+            <i className="swatch" style={{ background: "#f3eee4" }} /> 여유
+          </span>
+          <span>
+            <i className="swatch" style={{ background: "#dbe8c8" }} /> 적정
+          </span>
+          <span>
+            <i className="swatch" style={{ background: "#f3d2a4" }} /> 빠듯
+          </span>
+          <span>
+            <i className="swatch" style={{ background: "#f3c1b8" }} /> {WEEKLY_CAPACITY}인일 초과
+          </span>
+        </div>
+      </div>
+      <p className="hint" style={{ marginTop: -8 }}>
+        미완료 잔여 공수를 남은 평일에 균등 배분했습니다. 기한 초과분은 이번 주에 몰아 표시합니다.
+        소요일이 없으면 일정 기간으로 추정합니다.
+      </p>
+
+      <div className="heat-wrap">
+        <table className="heat">
+          <thead>
+            <tr>
+              <th className="name">담당자</th>
+              {weeks.map((week) => (
+                <th key={week}>{shortWeek(week)}주</th>
+              ))}
+              <th>잔여</th>
+              <th>미일정</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={row.name} className={person === row.name ? "selected" : ""}>
+                <td className="name">
+                  <button type="button" onClick={() => setPerson(person === row.name ? null : row.name)}>
+                    {row.name}
+                  </button>
+                </td>
+                {row.weeklyLoad.map((load, i) => {
+                  const band = loadBand(load);
+                  return (
+                    <td key={weeks[i]}>
+                      <span className={`cell ${band}`}>{load < 0.05 ? "—" : fmt(load)}</span>
+                    </td>
+                  );
+                })}
+                <td>{fmt(row.remainingDays)}</td>
+                <td>{row.unscheduledDays < 0.05 ? "—" : fmt(row.unscheduledDays)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <section className="people-grid">
+        <div className="panel">
+          <h2>이번 주 부하 순위 · 용량 {WEEKLY_CAPACITY}인일</h2>
+          <div className="person-list">
+            {rows
+              .filter((row) => row.name !== UNASSIGNED)
+              .map((row) => {
+                const load = row.weeklyLoad[0];
+                const band = loadBand(load);
+                return (
+                  <button
+                    key={row.name}
+                    type="button"
+                    className={`person ${person === row.name ? "on" : ""}`}
+                    onClick={() => setPerson(person === row.name ? null : row.name)}
+                  >
+                    <div>
+                      <b>{row.name}</b>
+                      <div className="meta">
+                        미완료 {row.open} · 초과 {row.overdue}
+                      </div>
+                    </div>
+                    <div className={`bar ${band}`}>
+                      <i style={{ width: `${Math.min(100, (load / WEEKLY_CAPACITY) * 100)}%` }} />
+                    </div>
+                    <div className="num">{fmt(load)}</div>
+                  </button>
+                );
+              })}
+          </div>
+        </div>
+
+        <div className="panel">
+          <h2>
+            작업 목록
+            {person ? ` · ${person}` : ""}
+            {` · ${visibleTasks.length}건`}
+          </h2>
+          {person ? (
+            <p className="hint" style={{ padding: "8px 16px 0" }}>
+              <button className="chip" type="button" onClick={() => setPerson(null)}>
+                담당자 필터 해제
+              </button>
+            </p>
+          ) : null}
+          <div className="table-wrap">
+            {visibleTasks.length === 0 ? (
+              <p className="empty">조건에 맞는 작업이 없습니다.</p>
+            ) : (
+              <table className="tasks">
+                <thead>
+                  <tr>
+                    <th>상태</th>
+                    <th>작업</th>
+                    <th>담당</th>
+                    <th>서비스</th>
+                    <th>일정</th>
+                    <th>진척</th>
+                    <th>잔여</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleTasks.map((task) => {
+                    const status = taskStatus(task, today);
+                    return (
+                      <tr key={task.id}>
+                        <td>
+                          <span className={`badge ${status}`}>{status}</span>
+                        </td>
+                        <td>
+                          <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
+                            {task.title}
+                          </a>
+                          {task.issue ? <div className="issue">{task.issue.slice(0, 80)}</div> : null}
+                        </td>
+                        <td>{task.assignees.join(", ") || UNASSIGNED}</td>
+                        <td>{task.service ?? "—"}</td>
+                        <td>{dateRange(task)}</td>
+                        <td>
+                          {task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}
+                        </td>
+                        <td>{fmt(remainingEffort(task))}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
+      </section>
+    </main>
+  );
+}
+
+function progressRatioPct(task: Task): number {
+  if (task.progress == null) return 0;
+  if (task.progress <= 1) return task.progress * 100;
+  return Math.min(task.progress, 100);
+}
