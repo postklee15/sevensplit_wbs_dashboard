@@ -347,9 +347,9 @@ export function Dashboard({
                 <thead>
                   <tr>
                     <th>상태</th>
+                    <th>서비스</th>
                     <th>작업</th>
                     <th>담당</th>
-                    <th>서비스</th>
                     <th>일정</th>
                     <th>진척</th>
                     <th>잔여</th>
@@ -363,6 +363,7 @@ export function Dashboard({
                         <td>
                           <span className={`badge ${status}`}>{status}</span>
                         </td>
+                        <td>{task.service ?? "—"}</td>
                         <td>
                           <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
                             {task.title}
@@ -370,7 +371,6 @@ export function Dashboard({
                           {task.issue ? <div className="issue">{task.issue.slice(0, 80)}</div> : null}
                         </td>
                         <td>{task.assignees.join(", ") || UNASSIGNED}</td>
-                        <td>{task.service ?? "—"}</td>
                         <td>{dateRange(task)}</td>
                         <td>
                           {task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}
