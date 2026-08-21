@@ -1,0 +1,35 @@
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - name: Write production env
+        run: |
+          printf 'NOTION_TOKEN=%s\nNOTION_DATABASE_ID=%s\n' \
+            "$NOTION_TOKEN" \
+            "${NOTION_DATABASE_ID:-37c1559b-095a-80f1-af80-e0be81606fe9}" \
+            > .env.sevensplit-wbs-dashboard
+      - uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      - name: Deploy to Firebase Hosting
+        run: |
+          npx -y firebase-tools@latest experiments:enable webframeworks
+          npx -y firebase-tools@latest deploy --only hosting,auth --project sevensplit-wbs-dashboard --non-interactive --force

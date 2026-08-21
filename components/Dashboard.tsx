@@ -1,7 +1,6 @@
 "use client";
 
-import { useMemo, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { useMemo, useState } from "react";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import {
@@ -38,9 +37,19 @@ function dateRange(task: Task): string {
   return `${task.start.slice(5).replace("-", "/")}–${task.end.slice(5).replace("-", "/")}`;
 }
 
-export function Dashboard({ payload }: { payload: DashboardPayload }) {
-  const router = useRouter();
-  const [pending, startTransition] = useTransition();
+export function Dashboard({
+  payload,
+  accountEmail,
+  onSignOut,
+  onRefresh,
+  refreshing = false,
+}: {
+  payload: DashboardPayload;
+  accountEmail?: string | null;
+  onSignOut?: () => void;
+  onRefresh?: () => void;
+  refreshing?: boolean;
+}) {
   const today = todayKst();
   const weeks = useMemo(() => weekStarts(today), [today]);
   const [leafOnly, setLeafOnly] = useState(true);
@@ -145,11 +154,21 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
           <button
             className="btn"
             type="button"
-            disabled={pending}
-            onClick={() => startTransition(() => router.refresh())}
+            disabled={refreshing}
+            onClick={() => onRefresh?.()}
           >
-            {pending ? "새로고침 중" : "노션 다시 읽기"}
+            {refreshing ? "새로고침 중" : "노션 다시 읽기"}
           </button>
+          {accountEmail ? (
+            <span className="account-chip">
+              {accountEmail}
+              {onSignOut ? (
+                <button className="chip" type="button" onClick={onSignOut}>
+                  로그아웃
+                </button>
+              ) : null}
+            </span>
+          ) : null}
         </div>
       </header>
 
@@ -239,7 +258,7 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
       </div>
       <p className="hint" style={{ marginTop: -8 }}>
         미완료 잔여 공수를 남은 평일에 균등 배분했습니다. 기한 초과분은 이번 주에 몰아 표시합니다.
-        소요일이 없으면 일정 기간으로 추정합니다.
+        소요일이 없으면 일정 기간으로 추정합니다. 일정과 소요일이 모두 없으면 미정으로 보고 부하에서 제외합니다.
       </p>
 
       <div className="heat-wrap">
@@ -359,7 +378,7 @@ export function Dashboard({ payload }: { payload: DashboardPayload }) {
                         <td>
                           {task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}
                         </td>
-                        <td>{fmt(remainingEffort(task))}</td>
+                        <td>{task.effortDays == null && !task.start ? "—" : fmt(remainingEffort(task))}</td>
                       </tr>
                     );
                   })}

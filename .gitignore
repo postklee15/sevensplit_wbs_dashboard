@@ -4,5 +4,10 @@
 node_modules
 .next
 dist
+out
 .DS_Store
 tsconfig.tsbuildinfo
+.firebase
+firebase-debug.log
+firebase-debug.*.log
+.firebaserc.local

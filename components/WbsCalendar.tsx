@@ -365,7 +365,9 @@ function DayTaskList({
                   {who}
                 </button>
                 {task.service ? ` · ${task.service}` : ""}
-                {` · 잔여 ${remainingEffort(task).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}인일`}
+                {task.effortDays == null && !task.start
+                  ? " · 일정·소요일 미정"
+                  : ` · 잔여 ${remainingEffort(task).toLocaleString("ko-KR", { maximumFractionDigits: 1 })}인일`}
               </div>
             </div>
           </li>

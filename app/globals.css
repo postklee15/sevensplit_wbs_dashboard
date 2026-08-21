@@ -418,10 +418,23 @@ table.tasks {
   margin: 0 0 16px;
 }
 
-.error-page {
-  max-width: 640px;
-  margin: 80px auto;
+.auth-page {
+  max-width: 520px;
+  margin: 96px auto;
   padding: 0 24px;
+}
+
+.auth-error {
+  color: var(--over);
+  font-size: 14px;
+}
+
+.account-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--muted);
 }
 
 .muted {

@@ -1,0 +1,23 @@
+{
+  "auth": {
+    "providers": {
+      "googleSignIn": {
+        "oAuthBrandDisplayName": "Sevensplit WBS",
+        "supportEmail": "proj.stockdiary@gmail.com"
+      }
+    }
+  },
+  "hosting": {
+    "source": ".",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "frameworksBackend": {
+      "region": "asia-northeast3",
+      "memory": "512MiB",
+      "maxInstances": 4
+    }
+  }
+}

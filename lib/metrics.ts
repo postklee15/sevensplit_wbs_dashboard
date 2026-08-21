@@ -48,13 +48,10 @@ export function remainingEffort(task: Task): number {
   const ratio = progressRatio(task);
   let effort = task.effortDays;
   if (effort == null) {
-    if (task.start) {
-      const start = parseYmd(task.start);
-      const end = parseYmd(task.end ?? task.start);
-      effort = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
-    } else {
-      effort = 1;
-    }
+    if (!task.start) return 0;
+    const start = parseYmd(task.start);
+    const end = parseYmd(task.end ?? task.start);
+    effort = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
   }
   return Math.max(0, effort * (1 - ratio));
 }
