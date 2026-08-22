@@ -54,14 +54,10 @@ function dateRange(task: Task): string {
 
 export function Dashboard({
   payload,
-  accountEmail,
-  onSignOut,
   onRefresh,
   refreshing = false,
 }: {
   payload: DashboardPayload;
-  accountEmail?: string | null;
-  onSignOut?: () => void;
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
@@ -132,7 +128,7 @@ export function Dashboard({
         <div>
           <p className="kicker">Split Invest · {payload.databaseTitle}</p>
           <h1>담당자별 리소스 현황</h1>
-          <p className="sub">
+      <p className="sub">
             하위 작업 공수 기준 · 주 용량 {WEEKLY_CAPACITY}인일 · {today} 기준 · {fetched} 동기화
           </p>
         </div>
@@ -187,16 +183,6 @@ export function Dashboard({
           >
             {refreshing ? "새로고침 중" : "노션 다시 읽기"}
           </button>
-          {accountEmail ? (
-            <span className="account-chip">
-              {accountEmail}
-              {onSignOut ? (
-                <button className="chip" type="button" onClick={onSignOut}>
-                  로그아웃
-                </button>
-              ) : null}
-            </span>
-          ) : null}
         </div>
       </header>
 

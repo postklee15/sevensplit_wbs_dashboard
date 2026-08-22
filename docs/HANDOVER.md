@@ -13,13 +13,13 @@
 
 Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원만 볼 수 있는 담당자 부하 대시보드입니다.
 
-화면 세 가지:
+화면:
 
-| 보기 | 역할 |
-|---|---|
-| 부하 | 담당자별 주간 부하 히트맵, KPI, 작업 표 |
-| 월력 | 월 캘린더. 이벤트 라벨: `작업명 / 서비스 / 담당자` |
-| 주력 | 주 캘린더. 같은 라벨 |
+| 보기 | 역할 | 접근 |
+|---|---|---|
+| 부하 / 월력 / 주력 | 담당자별 주간 부하 | 기본 허용, 슈퍼관리자가 끌 수 있음 |
+| 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자 또는 허용된 계정 |
+| 권한 `/admin/access` | 가입자 페이지 권한 | `shlim@sevensplit.com`만 |
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김.
 
@@ -90,7 +90,9 @@ npm run dev   # next dev --turbopack
   fetchWbsTasks          (Notion API, NOTION_TOKEN은 서버만)
   JSON { fetchedAt, databaseTitle, tasks }
 클라이언트
-  Dashboard / WbsCalendar  (lib/metrics.ts, lib/calendar.ts)
+  Dashboard / WbsCalendar / PerformanceBoard
+  AccessAdmin (슈퍼관리자)
+  ProfileGate → POST /api/me (Firestore users/{uid})
 ```
 
 핵심 파일:
@@ -109,7 +111,10 @@ npm run dev   # next dev --turbopack
 | `lib/notion.ts` | Notion query + 속성 매핑 |
 | `lib/metrics.ts` | 잔여 공수, 주간 부하, 용량 |
 | `lib/calendar.ts` | 캘린더 레이아웃 |
-| `lib/allowedEmail.ts` | `@sevensplit.com` |
+| `app/performance/page.tsx` | 완료 작업 성과. ACL 필요 |
+| `app/admin/access/page.tsx` | 슈퍼관리자 권한 UI |
+| `lib/acl.ts` | `shlim@sevensplit.com` 슈퍼관리자 |
+| `firestore.rules` | `users/{uid}` ACL. firebase-admin 없음 |
 | `firebase.json` | Hosting source `.` + webframeworks `asia-northeast3` |
 | `.github/workflows/deploy.yml` | `main` 푸시 → Firebase Hosting |
 
@@ -225,6 +230,7 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 - `npm ci` 후 `.env.sevensplit-wbs-dashboard`에 시크릿으로 토큰+DB ID 기록
 - `google-github-actions/auth@v2` + `FIREBASE_SERVICE_ACCOUNT`
 - `firebase deploy --only hosting` (SSR Function은 Hosting에 묶여 같이 올라감)
+- Firestore rules는 같은 워크플로에서 `--only firestore`. 권한 저장소가 `users/{uid}`.
 - **`auth`는 CD에서 빼 둠.** Google 로그인은 이미 프로비저닝됨. CD 서비스 계정은 `serviceusage.services.enable`이 없어 `--only auth`가 실패함.
 - **`FIREBASE_TOKEN`은 쓰지 않음.** `firebase login:ci` 불필요.
 

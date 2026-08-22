@@ -2,11 +2,9 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
-import { signOut } from "firebase/auth";
 import { Dashboard } from "@/components/Dashboard";
 import type { DashboardPayload } from "@/lib/types";
-import { auth } from "@/lib/firebase";
-import { clearSessionCookie, writeSessionCookie } from "@/lib/sessionCookie";
+import { writeSessionCookie } from "@/lib/sessionCookie";
 
 export function WbsApp({ user }: { user: User }) {
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
@@ -69,11 +67,6 @@ export function WbsApp({ user }: { user: User }) {
   return (
     <Dashboard
       payload={payload}
-      accountEmail={user.email}
-      onSignOut={() => {
-        clearSessionCookie();
-        void signOut(auth);
-      }}
       onRefresh={() => void load()}
       refreshing={loading}
     />

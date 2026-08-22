@@ -1,0 +1,87 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users
+// Document ID: Firebase Auth UID
+// Fields:
+//   email (string, required) — @sevensplit.com
+//   displayName (string, required)
+//   canDashboard (bool, required)
+//   canPerformance (bool, required)
+//   createdAt (string ISO, required on create)
+//   lastSeenAt (string ISO, required)
+// Super admin emails are hardcoded in rules; role flags from the client
+// cannot grant super admin.
+//
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isSelf(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+
+    function isSuperAdmin() {
+      return signedIn()
+        && request.auth.token.email is string
+        && request.auth.token.email.lower() == 'shlim@sevensplit.com';
+    }
+
+    function hasUserKeys(data) {
+      return data.keys().hasAll([
+        'email',
+        'displayName',
+        'canDashboard',
+        'canPerformance',
+        'createdAt',
+        'lastSeenAt'
+      ]);
+    }
+
+    function isValidUser(data) {
+      return hasUserKeys(data)
+        && data.email is string
+        && data.email.size() > 3
+        && data.email.matches('.*@sevensplit\\.com')
+        && data.displayName is string
+        && data.displayName.size() < 120
+        && data.canDashboard is bool
+        && data.canPerformance is bool
+        && data.createdAt is string
+        && data.lastSeenAt is string;
+    }
+
+    match /users/{uid} {
+      allow get: if isSelf(uid) || isSuperAdmin();
+      allow list: if isSuperAdmin();
+      allow create: if isSelf(uid)
+        && isValidUser(request.resource.data)
+        && request.resource.data.email.lower() == request.auth.token.email.lower()
+        && request.resource.data.canDashboard == true
+        && request.resource.data.canPerformance == (
+          request.auth.token.email.lower() == 'shlim@sevensplit.com'
+        );
+      allow update: if isValidUser(request.resource.data)
+        && (
+          (
+            isSelf(uid)
+            && request.resource.data.email == resource.data.email
+            && request.resource.data.canDashboard == resource.data.canDashboard
+            && request.resource.data.canPerformance == resource.data.canPerformance
+            && request.resource.data.createdAt == resource.data.createdAt
+          )
+          || (
+            isSuperAdmin()
+            && request.resource.data.email == resource.data.email
+            && request.resource.data.createdAt == resource.data.createdAt
+          )
+        );
+      allow delete: if false;
+    }
+  }
+}

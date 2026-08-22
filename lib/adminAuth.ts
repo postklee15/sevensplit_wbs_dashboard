@@ -4,7 +4,14 @@ import { isAllowedEmail } from "./allowedEmail";
 export type AuthFailure = {
   status: 401 | 403;
   error: string;
-  reason: "missing_token" | "invalid_token" | "forbidden_domain";
+  reason: "missing_token" | "invalid_token" | "forbidden_domain" | "forbidden_page";
+};
+
+export type AuthUser = {
+  email: string;
+  uid: string;
+  name: string;
+  token: string;
 };
 
 const PROJECT_ID = "sevensplit-wbs-dashboard";
@@ -30,7 +37,7 @@ function readToken(request: Request): string {
 
 export async function requireSevensplitUser(
   request: Request,
-): Promise<{ email: string } | AuthFailure> {
+): Promise<AuthUser | AuthFailure> {
   const token = readToken(request);
   if (!token) {
     return {
@@ -46,14 +53,21 @@ export async function requireSevensplitUser(
       audience: PROJECT_ID,
     });
     const email = typeof payload.email === "string" ? payload.email : "";
-    if (!isAllowedEmail(email)) {
+    const uid =
+      typeof payload.user_id === "string"
+        ? payload.user_id
+        : typeof payload.sub === "string"
+          ? payload.sub
+          : "";
+    const name = typeof payload.name === "string" ? payload.name : "";
+    if (!isAllowedEmail(email) || !uid) {
       return {
         status: 403,
         reason: "forbidden_domain",
         error: "@sevensplit.com Google 계정만 사용할 수 있습니다.",
       };
     }
-    return { email };
+    return { email, uid, name, token };
   } catch (error) {
     const message = error instanceof Error ? error.message : "unknown";
     console.error("id token verify failed:", message);
@@ -63,4 +77,8 @@ export async function requireSevensplitUser(
       error: "로그인 검증에 실패했습니다. 다시 로그인해 주세요.",
     };
   }
+}
+
+export function jsonAuthError(auth: AuthFailure) {
+  return { error: auth.error, reason: auth.reason };
 }
