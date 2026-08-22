@@ -44,6 +44,13 @@ export function progressRatio(task: Task): number {
   return Math.min(task.progress, 100) / 100;
 }
 
+/** 투입률. 없으면 1(100%). 0–1이면 비율, 그보다 크면 퍼센트. */
+export function allocationRatio(task: Task): number {
+  if (task.allocation == null) return 1;
+  if (task.allocation <= 1) return Math.max(0, task.allocation);
+  return Math.min(Math.max(0, task.allocation), 100) / 100;
+}
+
 export function remainingEffort(task: Task): number {
   const ratio = progressRatio(task);
   let effort = task.effortDays;
@@ -53,7 +60,7 @@ export function remainingEffort(task: Task): number {
     const end = parseYmd(task.end ?? task.start);
     effort = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
   }
-  return Math.max(0, effort * (1 - ratio));
+  return Math.max(0, effort * (1 - ratio) * allocationRatio(task));
 }
 
 export function taskStatus(task: Task, today = todayKst()): TaskStatus {
@@ -112,7 +119,7 @@ export function filterTasks(
       }
     }
     if (q) {
-      const hay = `${task.title} ${task.service ?? ""} ${task.issue}`.toLowerCase();
+      const hay = `${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;

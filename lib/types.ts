@@ -4,7 +4,9 @@ export type Task = {
   url: string;
   assignees: string[];
   service: string | null;
+  attribute: string | null;
   progress: number | null;
+  allocation: number | null;
   effortDays: number | null;
   start: string | null;
   end: string | null;

@@ -157,7 +157,7 @@ export function Dashboard({
             </button>
           </div>
           <input
-            placeholder="작업명, 이슈 검색"
+            placeholder="작업명, 속성, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -273,6 +273,7 @@ export function Dashboard({
       <p className="hint" style={{ marginTop: -8 }}>
         미완료 잔여 공수를 남은 평일에 균등 배분했습니다. 기한 초과분은 이번 주에 몰아 표시합니다.
         소요일이 없으면 일정 기간으로 추정합니다. 일정과 소요일이 모두 없으면 미정으로 보고 부하에서 제외합니다.
+        투입률이 있으면 잔여 공수에 곱하고, 없으면 100%로 봅니다.
       </p>
 
       <div className="heat-wrap">
@@ -334,6 +335,7 @@ export function Dashboard({
                   <tr>
                     <th>상태</th>
                     <th>서비스</th>
+                    <th>속성</th>
                     <th>작업</th>
                     <th>담당</th>
                     <th>일정</th>
@@ -350,6 +352,7 @@ export function Dashboard({
                           <span className={`badge ${status}`}>{status}</span>
                         </td>
                         <td>{task.service ?? "—"}</td>
+                        <td>{task.attribute ?? "—"}</td>
                         <td>
                           <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
                             {task.title}

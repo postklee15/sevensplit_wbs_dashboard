@@ -23,6 +23,8 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김.
 
+부하 보기 작업 목록 열: 상태 · 서비스 · **속성** · 작업 · 담당 · 일정 · 진척 · 잔여. 잔여·히트맵은 투입률을 곱함.
+
 라이브: https://sevensplit-wbs-dashboard.web.app
 
 ---
@@ -181,7 +183,9 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 | 작업명 | title | `title` |
 | 담당자 | people | `assignees` |
 | 서비스 | select | `service` |
+| 업무 속성 | select / multi_select / rich_text | `attribute` |
 | 진척도 | number (0–1 또는 0–100) | `progress` |
+| 투입률 | number (0–1 또는 0–100) | `allocation` (없으면 부하 계산 시 100%) |
 | 소요일 | number | `effortDays` |
 | 일정 | date | `start` / `end` |
 | 상위/하위 항목 | relation | `isLeaf` = 하위 항목 0건 |
@@ -197,7 +201,7 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 
 - **단위:** 인일 (person-day). 사람 1명이 하루 일한 양 = 1.
 - **주 용량:** `WEEKLY_CAPACITY = 5` (월–금).
-- **잔여 공수:** `소요일 × (1 − 진척도)`. 진척 0–1이면 그대로, 100이면 1.
+- **잔여 공수:** `소요일 × (1 − 진척도) × 투입률`. 진척·투입률은 0–1이면 그대로, 100이면 1. 투입률이 비어 있으면 **100%**.
 - 소요일 없음 + 일정 있음: 시작~종료 **달력 일수(양끝 포함, 최소 1일)** 로 추정.
 - 일정과 소요일 **둘 다 없음:** 미정 업무로 보고 부하·잔여 공수에서 제외 (0). 목록/캘린더에는 표시.
 - 담당자 여러 명: 잔여를 인원수로 균등 분배.

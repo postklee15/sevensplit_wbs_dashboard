@@ -12,7 +12,10 @@ type NotionProperty = {
   rich_text?: NotionRichText[];
   people?: NotionPerson[];
   select?: NotionSelect;
+  multi_select?: NotionSelect[];
+  status?: NotionSelect;
   number?: number | null;
+  formula?: { type?: string; number?: number | null };
   date?: NotionDate;
   url?: string | null;
   relation?: NotionRelation[];
@@ -33,6 +36,28 @@ function ymd(value: string | null | undefined): string | null {
   return value.slice(0, 10);
 }
 
+function numberValue(prop: NotionProperty | undefined): number | null {
+  if (prop?.number != null && Number.isFinite(prop.number)) return prop.number;
+  if (prop?.formula?.number != null && Number.isFinite(prop.formula.number)) {
+    return prop.formula.number;
+  }
+  return null;
+}
+
+function attributeValue(prop: NotionProperty | undefined): string | null {
+  if (!prop) return null;
+  const select = prop.select?.name?.trim();
+  if (select) return select;
+  const status = prop.status?.name?.trim();
+  if (status) return status;
+  const multi = (prop.multi_select ?? [])
+    .map((item) => item?.name?.trim())
+    .filter((name): name is string => Boolean(name));
+  if (multi.length) return multi.join(", ");
+  const text = plain(prop.rich_text);
+  return text || null;
+}
+
 export function parseTask(page: NotionPage): Task | null {
   const props = page.properties ?? {};
   const title = plain(props["작업명"]?.title);
@@ -46,8 +71,10 @@ export function parseTask(page: NotionPage): Task | null {
       .map((person) => person.name?.trim())
       .filter((name): name is string => Boolean(name)),
     service: props["서비스"]?.select?.name ?? null,
-    progress: props["진척도"]?.number ?? null,
-    effortDays: props["소요일"]?.number ?? null,
+    attribute: attributeValue(props["업무 속성"]),
+    progress: numberValue(props["진척도"]),
+    allocation: numberValue(props["투입률"]),
+    effortDays: numberValue(props["소요일"]),
     start: ymd(props["일정"]?.date?.start),
     end: ymd(props["일정"]?.date?.end) ?? ymd(props["일정"]?.date?.start),
     scheduleApproval: props["일정승인"]?.select?.name ?? null,
