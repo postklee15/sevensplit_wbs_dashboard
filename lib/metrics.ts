@@ -6,6 +6,8 @@ export const DAILY_CAPACITY = 1;
 export const WEEKDAY_COUNT = 5;
 export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"] as const;
 export const UNASSIGNED = "(미지정)";
+export const NO_SERVICE = "서비스없음";
+const UNASSIGNED_PREFIX = `${UNASSIGNED} · `;
 
 export function todayKst(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
@@ -147,11 +149,7 @@ export function filterTasks(
     if (opts.service && task.service !== opts.service) return false;
     if (opts.hideDone && taskStatus(task, opts.today) === "완료") return false;
     if (opts.person) {
-      if (opts.person === UNASSIGNED) {
-        if (task.assignees.length > 0) return false;
-      } else if (!task.assignees.includes(opts.person)) {
-        return false;
-      }
+      if (!matchesPerson(task, opts.person)) return false;
     }
     if (q) {
       const hay = `${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue}`.toLowerCase();
@@ -167,6 +165,39 @@ export function servicesOf(tasks: Task[]): string[] {
     if (task.service) set.add(task.service);
   }
   return [...set].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
+export function unassignedRowName(service: string | null): string {
+  return `${UNASSIGNED} · ${service?.trim() || NO_SERVICE}`;
+}
+
+export function isUnassignedRow(name: string): boolean {
+  return name === UNASSIGNED || name.startsWith(UNASSIGNED_PREFIX);
+}
+
+/** `null`이면 서비스 없는 미지정. `UNASSIGNED` 단독은 쓰지 않음. */
+export function unassignedServiceOf(name: string): string | null {
+  const rest = name.startsWith(UNASSIGNED_PREFIX)
+    ? name.slice(UNASSIGNED_PREFIX.length)
+    : NO_SERVICE;
+  return rest === NO_SERVICE ? null : rest;
+}
+
+export function unassignedDisplayName(name: string): string {
+  if (!isUnassignedRow(name)) return name;
+  if (name === UNASSIGNED) return UNASSIGNED;
+  return `미지정 · ${unassignedServiceOf(name) ?? NO_SERVICE}`;
+}
+
+export function matchesPerson(task: Task, person: string): boolean {
+  if (isUnassignedRow(person)) {
+    if (task.assignees.length > 0) return false;
+    if (person === UNASSIGNED) return true;
+    const service = unassignedServiceOf(person);
+    if (service == null) return !task.service?.trim();
+    return task.service === service;
+  }
+  return task.assignees.includes(person);
 }
 
 export function buildPersonRows(
@@ -199,7 +230,7 @@ export function buildPersonRows(
   };
 
   for (const task of tasks) {
-    const names = task.assignees.length > 0 ? task.assignees : [UNASSIGNED];
+    const names = task.assignees.length > 0 ? task.assignees : [unassignedRowName(task.service)];
     const share = 1 / names.length;
     const remain = remainingEffort(task) * share;
     const status = taskStatus(task, today);
@@ -255,6 +286,10 @@ export function buildPersonRows(
   }
 
   return [...map.values()].sort((a, b) => {
+    const aU = isUnassignedRow(a.name) ? 1 : 0;
+    const bU = isUnassignedRow(b.name) ? 1 : 0;
+    if (aU !== bU) return aU - bU;
+    if (aU) return a.name.localeCompare(b.name, "ko");
     const loadDelta = b.weeklyLoad[0] - a.weeklyLoad[0];
     if (Math.abs(loadDelta) > 0.01) return loadDelta;
     return b.remainingDays - a.remainingDays;
@@ -272,13 +307,14 @@ export function loadBand(
 }
 
 export function summary(rows: PersonRow[]) {
-  const people = rows.filter((row) => row.name !== UNASSIGNED);
+  const people = rows.filter((row) => !isUnassignedRow(row.name));
+  const unassigned = rows.filter((row) => isUnassignedRow(row.name));
   return {
     people: people.length,
     open: people.reduce((sum, row) => sum + row.open, 0),
     overdue: people.reduce((sum, row) => sum + row.overdue, 0),
     remaining: people.reduce((sum, row) => sum + row.remainingDays, 0),
     thisWeekOver: people.filter((row) => loadBand(row.weeklyLoad[0]) === "over").length,
-    unassignedOpen: rows.find((row) => row.name === UNASSIGNED)?.open ?? 0,
+    unassignedOpen: unassigned.reduce((sum, row) => sum + row.open, 0),
   };
 }

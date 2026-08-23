@@ -10,6 +10,7 @@ import {
   parseYmd,
   remainingEffort,
   taskStatus,
+  unassignedRowName,
 } from "@/lib/metrics";
 import {
   WEEKDAYS,
@@ -360,7 +361,7 @@ function DayTaskList({
                 <button
                   type="button"
                   className="inline-person"
-                  onClick={() => onSelectPerson(task.assignees[0] ?? UNASSIGNED)}
+                  onClick={() => onSelectPerson(task.assignees[0] ?? unassignedRowName(task.service))}
                 >
                   {who}
                 </button>

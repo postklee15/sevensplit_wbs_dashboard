@@ -200,11 +200,24 @@ h1 {
   position: sticky;
   left: 0;
   background: var(--paper);
-  min-width: 108px;
+  min-width: 128px;
+  white-space: normal;
 }
 
 .heat th.name {
   background: var(--paper-2);
+}
+
+.heat .name-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.heat tr.unassigned td.name button {
+  color: var(--muted);
 }
 
 .heat tr.selected td {

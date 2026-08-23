@@ -5,12 +5,14 @@ import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import {
   DAILY_CAPACITY,
+  NO_SERVICE,
   UNASSIGNED,
   WEEKDAY_LABELS,
   WEEKLY_CAPACITY,
   addDays,
   buildPersonRows,
   filterTasks,
+  isUnassignedRow,
   loadBand,
   parseYmd,
   remainingEffort,
@@ -18,6 +20,8 @@ import {
   summary,
   taskStatus,
   todayKst,
+  unassignedDisplayName,
+  unassignedServiceOf,
   weekStarts,
   weekdaysOf,
 } from "@/lib/metrics";
@@ -96,7 +100,7 @@ export function Dashboard({
 
   const peopleLoad = useMemo(() => {
     return rows
-      .filter((row) => row.name !== UNASSIGNED)
+      .filter((row) => !isUnassignedRow(row.name))
       .map((row) => ({ row, load: row.weeklyLoad[loadWeek] ?? 0 }))
       .sort((a, b) => {
         const delta = b.load - a.load;
@@ -231,7 +235,7 @@ export function Dashboard({
         ))}
         {person ? (
           <button className="chip on" type="button" onClick={() => setPerson(null)}>
-            담당자 {person} ×
+            담당자 {isUnassignedRow(person) ? unassignedDisplayName(person) : person} ×
           </button>
         ) : null}
       </section>
@@ -261,8 +265,8 @@ export function Dashboard({
 
       {totals.unassignedOpen > 0 && view === "load" ? (
         <p className="hint" style={{ marginTop: -12, marginBottom: 20 }}>
-          담당자가 없는 미완료 작업 {totals.unassignedOpen}건이 있습니다. 표에서 “(미지정)”을 누르면
-          목록을 볼 수 있습니다.
+          담당자가 없는 미완료 작업 {totals.unassignedOpen}건이 있습니다. 히트맵의 미지정 행을 누르면
+          서비스별로 목록을 볼 수 있습니다.
         </p>
       ) : null}
 
@@ -369,10 +373,13 @@ export function Dashboard({
           </thead>
           <tbody>
             {rows.map((row) => (
-              <tr key={row.name} className={person === row.name ? "selected" : ""}>
+              <tr
+                key={row.name}
+                className={`${person === row.name ? "selected" : ""} ${isUnassignedRow(row.name) ? "unassigned" : ""}`.trim()}
+              >
                 <td className="name">
                   <button type="button" onClick={() => setPerson(person === row.name ? null : row.name)}>
-                    {row.name}
+                    {heatNameLabel(row.name)}
                   </button>
                 </td>
                 {heatGrain === "week"
@@ -412,7 +419,7 @@ export function Dashboard({
         <div className="panel tasks-panel">
           <h2>
             작업 목록
-            {person ? ` · ${person}` : ""}
+            {person ? ` · ${isUnassignedRow(person) ? unassignedDisplayName(person) : person}` : ""}
             {` · ${visibleTasks.length}건`}
           </h2>
           {person ? (
@@ -527,4 +534,14 @@ function progressRatioPct(task: Task): number {
   if (task.progress == null) return 0;
   if (task.progress <= 1) return task.progress * 100;
   return Math.min(task.progress, 100);
+}
+
+function heatNameLabel(name: string) {
+  if (!isUnassignedRow(name) || name === UNASSIGNED) return name;
+  return (
+    <>
+      미지정
+      <span className="name-sub">{unassignedServiceOf(name) ?? NO_SERVICE}</span>
+    </>
+  );
 }
