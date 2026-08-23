@@ -143,8 +143,17 @@ h1 {
 .section-head {
   display: flex;
   justify-content: space-between;
-  align-items: baseline;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
   margin: 8px 0 12px;
+}
+
+.section-head-lead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .section-head h2 {
@@ -213,6 +222,36 @@ h1 {
 
 .heat td.name button:hover {
   text-decoration: underline;
+}
+
+.heat-week {
+  all: unset;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.heat-week:hover {
+  text-decoration: underline;
+  color: var(--ink);
+}
+
+.heat-cell-btn {
+  all: unset;
+  cursor: pointer;
+  display: inline-block;
+}
+
+.heat th.today,
+.heat td.today {
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+.chips.heat-weeks {
+  margin: 0 0 12px;
+}
+
+.heat-hint {
+  margin: -4px 0 12px;
 }
 
 .cell {

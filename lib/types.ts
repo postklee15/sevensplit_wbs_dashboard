@@ -29,6 +29,8 @@ export type PersonRow = {
   noDate: number;
   remainingDays: number;
   weeklyLoad: number[];
+  /** 주차별 월–금 일간 부하. `dailyLoad[weekIndex][0=월 … 4=금]` */
+  dailyLoad: number[][];
   unscheduledDays: number;
 };
 

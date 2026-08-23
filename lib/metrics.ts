@@ -2,6 +2,9 @@ import type { PersonRow, Task, TaskStatus } from "./types";
 
 export const WEEK_COUNT = 8;
 export const WEEKLY_CAPACITY = 5;
+export const DAILY_CAPACITY = 1;
+export const WEEKDAY_COUNT = 5;
+export const WEEKDAY_LABELS = ["월", "화", "수", "목", "금"] as const;
 export const UNASSIGNED = "(미지정)";
 
 export function todayKst(): string {
@@ -95,6 +98,38 @@ function weekIndex(ymd: string, weeks: string[]): number {
   return -1;
 }
 
+/** 월=0 … 금=4. 주말이면 -1. */
+export function weekdayIndex(ymd: string): number {
+  const wd = parseYmd(ymd).getDay();
+  if (wd === 0 || wd === 6) return -1;
+  return wd - 1;
+}
+
+export function weekdaysOf(monday: string): string[] {
+  return Array.from({ length: WEEKDAY_COUNT }, (_, i) => formatYmd(addDays(parseYmd(monday), i)));
+}
+
+function emptyDaily(weekCount: number): number[][] {
+  return Array.from({ length: weekCount }, () => Array(WEEKDAY_COUNT).fill(0));
+}
+
+/** 기한 초과 잔여를 넣을 평일. 오늘이 이번 주 평일이면 오늘, 아니면 이번 주 금요일. */
+export function overdueBucketDay(today: string, week0Monday: string): string {
+  const todayDate = parseYmd(today);
+  const monday = parseYmd(week0Monday);
+  const friday = addDays(monday, 4);
+  const wd = todayDate.getDay();
+  if (
+    wd >= 1 &&
+    wd <= 5 &&
+    todayDate.getTime() >= monday.getTime() &&
+    todayDate.getTime() <= friday.getTime()
+  ) {
+    return today;
+  }
+  return formatYmd(friday);
+}
+
 export function filterTasks(
   tasks: Task[],
   opts: {
@@ -155,6 +190,7 @@ export function buildPersonRows(
         noDate: 0,
         remainingDays: 0,
         weeklyLoad: Array(weeks.length).fill(0),
+        dailyLoad: emptyDaily(weeks.length),
         unscheduledDays: 0,
       };
       map.set(name, row);
@@ -191,22 +227,30 @@ export function buildPersonRows(
 
     const end = task.end ?? task.start;
     if (end < today) {
-      for (const name of names) ensure(name).weeklyLoad[0] += remain;
+      const dump = overdueBucketDay(today, weeks[0] ?? today);
+      const dumpDay = weekdayIndex(dump);
+      for (const name of names) {
+        const row = ensure(name);
+        row.weeklyLoad[0] += remain;
+        row.dailyLoad[0][dumpDay >= 0 ? dumpDay : 4] += remain;
+      }
       continue;
     }
 
     const rangeStart = task.start > today ? task.start : today;
     const days = eachDate(rangeStart, end);
-    const weekdays = days.filter((d) => {
-      const wd = parseYmd(d).getDay();
-      return wd !== 0 && wd !== 6;
-    });
+    const weekdays = days.filter((d) => weekdayIndex(d) >= 0);
     const alloc = weekdays.length > 0 ? weekdays : days;
     const perDay = remain / alloc.length;
     for (const day of alloc) {
       const idx = weekIndex(day, weeks);
       if (idx < 0) continue;
-      for (const name of names) ensure(name).weeklyLoad[idx] += perDay;
+      const dayIdx = weekdayIndex(day);
+      for (const name of names) {
+        const row = ensure(name);
+        row.weeklyLoad[idx] += perDay;
+        row.dailyLoad[idx][dayIdx >= 0 ? dayIdx : 4] += perDay;
+      }
     }
   }
 
@@ -217,10 +261,13 @@ export function buildPersonRows(
   });
 }
 
-export function loadBand(days: number): "idle" | "ok" | "busy" | "over" {
+export function loadBand(
+  days: number,
+  capacity = WEEKLY_CAPACITY,
+): "idle" | "ok" | "busy" | "over" {
   if (days <= 0.05) return "idle";
-  if (days < WEEKLY_CAPACITY * 0.7) return "ok";
-  if (days <= WEEKLY_CAPACITY * 1.1) return "busy";
+  if (days < capacity * 0.7) return "ok";
+  if (days <= capacity * 1.1) return "busy";
   return "over";
 }
 

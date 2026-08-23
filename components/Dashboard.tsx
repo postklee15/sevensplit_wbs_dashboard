@@ -4,7 +4,9 @@ import { useMemo, useState } from "react";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import {
+  DAILY_CAPACITY,
   UNASSIGNED,
+  WEEKDAY_LABELS,
   WEEKLY_CAPACITY,
   addDays,
   buildPersonRows,
@@ -17,10 +19,12 @@ import {
   taskStatus,
   todayKst,
   weekStarts,
+  weekdaysOf,
 } from "@/lib/metrics";
 
 type ViewMode = "load" | "month" | "week";
 type LoadWeekIndex = 0 | 1 | 2;
+type HeatGrain = "week" | "day";
 
 const LOAD_WEEK_TABS: { index: LoadWeekIndex; label: string }[] = [
   { index: 0, label: "이번주" },
@@ -70,6 +74,8 @@ export function Dashboard({
   const [query, setQuery] = useState("");
   const [view, setView] = useState<ViewMode>("load");
   const [loadWeek, setLoadWeek] = useState<LoadWeekIndex>(0);
+  const [heatGrain, setHeatGrain] = useState<HeatGrain>("week");
+  const [heatWeek, setHeatWeek] = useState(0);
 
   const scoped = useMemo(
     () =>
@@ -99,6 +105,25 @@ export function Dashboard({
       });
   }, [rows, loadWeek]);
   const weekOverCount = peopleLoad.filter((item) => loadBand(item.load) === "over").length;
+  const heatDays = useMemo(
+    () => weekdaysOf(weeks[heatWeek] ?? weeks[0] ?? today),
+    [weeks, heatWeek, today],
+  );
+  const heatCapacity = heatGrain === "day" ? DAILY_CAPACITY : WEEKLY_CAPACITY;
+  const heatWeekTabs = useMemo(
+    () =>
+      weeks.map((monday, i) => ({
+        index: i,
+        label:
+          i === 0 ? "이번주" : i === 1 ? "다음주" : i === 2 ? "다다음주" : `${shortWeek(monday)}주`,
+      })),
+    [weeks],
+  );
+
+  const openDailyWeek = (index: number) => {
+    setHeatWeek(index);
+    setHeatGrain("day");
+  };
 
   const visibleTasks = useMemo(
     () =>
@@ -254,7 +279,29 @@ export function Dashboard({
       {view === "load" ? (
         <>
       <div className="section-head">
-        <h2>주간 부하 히트맵</h2>
+        <div className="section-head-lead">
+          <h2>{heatGrain === "day" ? "일간 부하 히트맵" : "주간 부하 히트맵"}</h2>
+          <div className="view-switch" role="tablist" aria-label="히트맵 단위">
+            <button
+              className={`chip ${heatGrain === "week" ? "on" : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={heatGrain === "week"}
+              onClick={() => setHeatGrain("week")}
+            >
+              주간
+            </button>
+            <button
+              className={`chip ${heatGrain === "day" ? "on" : ""}`}
+              type="button"
+              role="tab"
+              aria-selected={heatGrain === "day"}
+              onClick={() => setHeatGrain("day")}
+            >
+              일간
+            </button>
+          </div>
+        </div>
         <div className="legend">
           <span>
             <i className="swatch" style={{ background: "#f3eee4" }} /> 여유
@@ -266,24 +313,56 @@ export function Dashboard({
             <i className="swatch" style={{ background: "#f3d2a4" }} /> 빠듯
           </span>
           <span>
-            <i className="swatch" style={{ background: "#f3c1b8" }} /> {WEEKLY_CAPACITY}인일 초과
+            <i className="swatch" style={{ background: "#f3c1b8" }} /> {heatCapacity}인일 초과
           </span>
         </div>
       </div>
-      <p className="hint" style={{ marginTop: -8 }}>
+      <p className="hint heat-hint">
         미완료 잔여 공수를 남은 평일에 균등 배분했습니다. 기한 초과분은 이번 주에 몰아 표시합니다.
         소요일이 없으면 일정 기간으로 추정합니다. 일정과 소요일이 모두 없으면 미정으로 보고 부하에서 제외합니다.
         투입률이 있으면 잔여 공수에 곱하고, 없으면 100%로 봅니다.
+        {heatGrain === "week"
+          ? " 주 머리글이나 칸을 누르면 그 주의 일간(월–금)을 봅니다."
+          : ` ${weekSpan(weeks[heatWeek] ?? weeks[0])} 평일 배분입니다. 색은 하루 ${DAILY_CAPACITY}인일 기준입니다.`}
       </p>
+      {heatGrain === "day" ? (
+        <div className="chips heat-weeks" aria-label="히트맵 주">
+          {heatWeekTabs.map((tab) => (
+            <button
+              key={tab.index}
+              className={`chip ${heatWeek === tab.index ? "on" : ""}`}
+              type="button"
+              onClick={() => setHeatWeek(tab.index)}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+      ) : null}
 
       <div className="heat-wrap">
         <table className="heat">
           <thead>
             <tr>
               <th className="name">담당자</th>
-              {weeks.map((week) => (
-                <th key={week}>{shortWeek(week)}주</th>
-              ))}
+              {heatGrain === "week"
+                ? weeks.map((week, i) => (
+                    <th key={week}>
+                      <button
+                        type="button"
+                        className="heat-week"
+                        onClick={() => openDailyWeek(i)}
+                        title="이 주 일간 보기"
+                      >
+                        {shortWeek(week)}주
+                      </button>
+                    </th>
+                  ))
+                : heatDays.map((day, i) => (
+                    <th key={day} className={day === today ? "today" : undefined}>
+                      {shortWeek(day)} {WEEKDAY_LABELS[i]}
+                    </th>
+                  ))}
               <th>잔여</th>
               <th>미일정</th>
             </tr>
@@ -296,14 +375,31 @@ export function Dashboard({
                     {row.name}
                   </button>
                 </td>
-                {row.weeklyLoad.map((load, i) => {
-                  const band = loadBand(load);
-                  return (
-                    <td key={weeks[i]}>
-                      <span className={`cell ${band}`}>{load < 0.05 ? "—" : fmt(load)}</span>
-                    </td>
-                  );
-                })}
+                {heatGrain === "week"
+                  ? row.weeklyLoad.map((load, i) => {
+                      const band = loadBand(load, WEEKLY_CAPACITY);
+                      return (
+                        <td key={weeks[i]}>
+                          <button
+                            type="button"
+                            className="heat-cell-btn"
+                            onClick={() => openDailyWeek(i)}
+                            title="이 주 일간 보기"
+                          >
+                            <span className={`cell ${band}`}>{load < 0.05 ? "—" : fmt(load)}</span>
+                          </button>
+                        </td>
+                      );
+                    })
+                  : (row.dailyLoad[heatWeek] ?? []).map((load, i) => {
+                      const day = heatDays[i];
+                      const band = loadBand(load, DAILY_CAPACITY);
+                      return (
+                        <td key={day} className={day === today ? "today" : undefined}>
+                          <span className={`cell ${band}`}>{load < 0.05 ? "—" : fmt(load)}</span>
+                        </td>
+                      );
+                    })}
                 <td>{fmt(row.remainingDays)}</td>
                 <td>{row.unscheduledDays < 0.05 ? "—" : fmt(row.unscheduledDays)}</td>
               </tr>
