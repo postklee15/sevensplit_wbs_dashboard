@@ -117,6 +117,23 @@ h1 {
   margin-bottom: 28px;
 }
 
+.kpis.cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+button.kpi {
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  width: 100%;
+}
+
+button.kpi.on {
+  border-color: var(--ink);
+  box-shadow: inset 0 0 0 1px var(--ink);
+}
+
 .kpi {
   background: var(--paper);
   border: 1px solid var(--line);
@@ -465,10 +482,34 @@ table.tasks {
   background: #f7f1e8;
 }
 
-.badge.미지정 {
+.badge.ap-미지정 {
+  color: var(--muted);
+}
+
+.badge.ap-승인 {
+  color: var(--ok);
+  border-color: #dbe8c8;
+  background: #eef5e4;
+}
+
+.badge.ap-반려 {
   color: var(--over);
   border-color: #f3c1b8;
   background: #fbe8e4;
+}
+
+.badge.ap-보류 {
+  color: var(--busy);
+  border-color: #f3d2a4;
+  background: #f8ead6;
+}
+
+.approval-panel {
+  margin-bottom: 16px;
+}
+
+.approval-panel h2 {
+  padding-bottom: 8px;
 }
 
 .badge {
@@ -499,6 +540,12 @@ table.tasks {
 .badge.완료,
 .badge.일정없음 {
   color: var(--muted);
+}
+
+.badge.미지정 {
+  color: var(--over);
+  border-color: #f3c1b8;
+  background: #fbe8e4;
 }
 
 .title-link {

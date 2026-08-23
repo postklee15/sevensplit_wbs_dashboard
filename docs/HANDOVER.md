@@ -18,6 +18,7 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 | 보기 | 역할 | 접근 |
 |---|---|---|
 | 부하 / 월력 / 주력 | 담당자별 주간·일간 부하 | 기본 허용, 슈퍼관리자가 끌 수 있음 |
+| 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같은 권한 (`canDashboard`) |
 | 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자 또는 허용된 계정 |
 | 권한 `/admin/access` | 가입자 페이지 권한 | `shlim@sevensplit.com`만 |
 
@@ -189,7 +190,7 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 | 소요일 | number | `effortDays` |
 | 일정 | date | `start` / `end` |
 | 상위/하위 항목 | relation | `isLeaf` = 하위 항목 0건 |
-| 일정승인, 배포승인 | select | 표시용 |
+| 일정승인, 배포승인 | select | 일정승인은 `/approval`에서 미지정·승인·반려·보류로 구분. 빈 값은 미지정 |
 | 내용/이슈 | rich_text | `issue` |
 | URL | url | 페이지 URL은 Notion page url 사용 |
 
