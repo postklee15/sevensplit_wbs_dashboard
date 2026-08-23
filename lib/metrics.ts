@@ -167,6 +167,17 @@ export function servicesOf(tasks: Task[]): string[] {
   return [...set].sort((a, b) => a.localeCompare(b, "ko"));
 }
 
+export function assigneesOf(tasks: Task[]): string[] {
+  const set = new Set<string>();
+  for (const task of tasks) {
+    for (const name of task.assignees) {
+      const trimmed = name.trim();
+      if (trimmed) set.add(trimmed);
+    }
+  }
+  return [...set].sort((a, b) => a.localeCompare(b, "ko"));
+}
+
 export function unassignedRowName(service: string | null): string {
   return `${UNASSIGNED} · ${service?.trim() || NO_SERVICE}`;
 }
@@ -197,7 +208,7 @@ export function matchesPerson(task: Task, person: string): boolean {
     if (service == null) return !task.service?.trim();
     return task.service === service;
   }
-  return task.assignees.includes(person);
+  return task.assignees.some((name) => name.trim() === person.trim());
 }
 
 export function buildPersonRows(

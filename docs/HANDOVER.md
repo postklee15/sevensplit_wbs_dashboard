@@ -17,10 +17,12 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 
 | 보기 | 역할 | 접근 |
 |---|---|---|
+| 내 업무 `/my` | 프로필에 저장한 노션 담당자 이름의 작업만 | 부하와 같은 권한 (`canDashboard`). 이름이 없으면 `/profile` |
 | 부하 / 월력 / 주력 | 담당자별 주간·일간 부하 | 기본 허용, 슈퍼관리자가 끌 수 있음 |
 | 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같은 권한 (`canDashboard`) |
 | 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자 또는 허용된 계정 |
 | 권한 `/admin/access` | 가입자 페이지 권한 | `shlim@sevensplit.com`만 |
+| 프로필 `/profile` | 내 업무에 쓸 노션 담당자 이름(`workName`) | 로그인한 `@sevensplit.com` |
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김.
 
@@ -103,6 +105,10 @@ npm run dev   # next dev --turbopack
 | 경로 | 역할 |
 |---|---|
 | `app/page.tsx` | `AuthGate` + `WbsApp` |
+| `app/my/page.tsx` | 내 업무. `workName`과 담당자 완전 일치 |
+| `app/profile/page.tsx` | 노션 담당자 이름 저장 |
+| `components/MyWorkBoard.tsx` | 내 업무 목록 + 프로필 폼 |
+| `app/api/me/route.ts` | `POST` 하트비트, `PATCH` `workName` |
 | `components/AuthGate.tsx` | Google 로그인 게이트 |
 | `components/WbsApp.tsx` | `/api/wbs` 호출, 세션 쿠키 |
 | `components/Dashboard.tsx` | 부하 뷰 + 보기 전환 |

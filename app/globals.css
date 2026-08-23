@@ -589,6 +589,46 @@ table.tasks {
   color: var(--muted);
 }
 
+.account-chip .work-name {
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.form-card {
+  max-width: 520px;
+  margin-top: 16px;
+  padding: 18px 20px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--paper);
+}
+
+.form-card label {
+  display: block;
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 6px;
+}
+
+.form-card input[type="text"] {
+  width: 100%;
+  margin-top: 6px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 14px;
+}
+
+.form-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
 .site-nav {
   display: flex;
   justify-content: space-between;

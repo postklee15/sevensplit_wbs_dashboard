@@ -6,6 +6,8 @@ export type AccessProfile = {
   uid: string;
   email: string;
   displayName: string;
+  /** 노션 담당자 이름. 내 업무 필터에 사용. 하트비트가 덮어쓰지 않음. */
+  workName: string;
   canDashboard: boolean;
   canPerformance: boolean;
   isSuperAdmin: boolean;

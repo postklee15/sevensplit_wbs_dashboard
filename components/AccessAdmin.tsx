@@ -74,6 +74,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
               <tr>
                 <th>이메일</th>
                 <th>이름</th>
+                <th>업무 이름</th>
                 <th>역할</th>
                 <th>부하 대시보드</th>
                 <th>성과 페이지</th>
@@ -85,6 +86,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                 <tr key={user.uid}>
                   <td>{user.email}</td>
                   <td>{user.displayName || "—"}</td>
+                  <td>{user.workName || "—"}</td>
                   <td>{user.isSuperAdmin ? "슈퍼 관리자" : "구성원"}</td>
                   <td>
                     <label className="toggle">

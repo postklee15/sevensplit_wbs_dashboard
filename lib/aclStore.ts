@@ -5,6 +5,7 @@ import {
   type AccessProfile,
 } from "./acl";
 import { boolField, getDocument, listDocuments, patchDocument, strField } from "./firestoreRest";
+import { isUnassignedRow } from "./metrics";
 
 const COLLECTION = "users";
 
@@ -18,6 +19,7 @@ function toProfile(
     uid,
     email,
     displayName: strField(fields, "displayName"),
+    workName: strField(fields, "workName").trim(),
     canDashboard: boolField(fields, "canDashboard", true),
     canPerformance: boolField(fields, "canPerformance", false),
     isSuperAdmin: isSuperAdminEmail(email),
@@ -44,17 +46,19 @@ export async function heartbeatUser(opts: {
       {
         email,
         displayName: opts.displayName,
+        workName: "",
         canDashboard: true,
         canPerformance: superAdmin,
         createdAt: now,
         lastSeenAt: now,
       },
-      ["email", "displayName", "canDashboard", "canPerformance", "createdAt", "lastSeenAt"],
+      ["email", "displayName", "workName", "canDashboard", "canPerformance", "createdAt", "lastSeenAt"],
     );
     return applySuperAdmin({
       uid: opts.uid,
       email,
       displayName: opts.displayName,
+      workName: "",
       canDashboard: true,
       canPerformance: superAdmin,
       isSuperAdmin: superAdmin,
@@ -102,4 +106,22 @@ export async function updateAccess(
   };
   await patchDocument(token, COLLECTION, uid, next, ["canDashboard", "canPerformance"]);
   return { ...current, ...next };
+}
+
+export async function updateWorkName(
+  token: string,
+  uid: string,
+  workName: string,
+): Promise<AccessProfile> {
+  const existing = await getDocument(token, COLLECTION, uid);
+  if (!existing) {
+    throw new Error("프로필이 없습니다. 한 번 로그아웃 후 다시 로그인해 주세요.");
+  }
+  const current = toProfile(uid, existing.fields, "");
+  const next = workName.trim().slice(0, 79);
+  if (isUnassignedRow(next)) {
+    throw new Error("미지정 행 이름은 업무 이름으로 쓸 수 없습니다.");
+  }
+  await patchDocument(token, COLLECTION, uid, { workName: next }, ["workName"]);
+  return { ...current, workName: next };
 }

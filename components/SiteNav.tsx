@@ -20,6 +20,11 @@ export function SiteNav({
     <nav className="site-nav" aria-label="페이지">
       <div className="view-switch" role="tablist">
         {profile.canDashboard ? (
+          <Link className={`chip ${pathname === "/my" ? "on" : ""}`} href="/my">
+            내 업무
+          </Link>
+        ) : null}
+        {profile.canDashboard ? (
           <Link className={`chip ${pathname === "/" ? "on" : ""}`} href="/">
             부하
           </Link>
@@ -42,6 +47,10 @@ export function SiteNav({
       </div>
       <span className="account-chip">
         {profile.isSuperAdmin ? <span className="badge">슈퍼관리자</span> : null}
+        {profile.workName ? <span className="work-name">{profile.workName}</span> : null}
+        <Link className={`chip ${pathname === "/profile" ? "on" : ""}`} href="/profile">
+          프로필
+        </Link>
         {user.email}
         <button
           className="chip"

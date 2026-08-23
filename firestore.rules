@@ -8,7 +8,8 @@ rules_version = '2';
 // Document ID: Firebase Auth UID
 // Fields:
 //   email (string, required) — @sevensplit.com
-//   displayName (string, required)
+//   displayName (string, required) — Google 표시 이름. 하트비트가 갱신
+//   workName (string, optional) — 노션 담당자 이름. 본인이 프로필에서 설정
 //   canDashboard (bool, required)
 //   canPerformance (bool, required)
 //   createdAt (string ISO, required on create)
@@ -53,7 +54,9 @@ service cloud.firestore {
         && data.canDashboard is bool
         && data.canPerformance is bool
         && data.createdAt is string
-        && data.lastSeenAt is string;
+        && data.lastSeenAt is string
+        && (!('workName' in data)
+          || (data.workName is string && data.workName.size() < 80));
     }
 
     match /users/{uid} {

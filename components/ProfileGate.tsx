@@ -11,7 +11,12 @@ export function ProfileGate({
   children,
 }: {
   user: User;
-  children: (ctx: { user: User; profile: AccessProfile; token: string }) => ReactNode;
+  children: (ctx: {
+    user: User;
+    profile: AccessProfile;
+    token: string;
+    setProfile: (profile: AccessProfile) => void;
+  }) => ReactNode;
 }) {
   const [profile, setProfile] = useState<AccessProfile | null>(null);
   const [token, setToken] = useState("");
@@ -72,7 +77,7 @@ export function ProfileGate({
   return (
     <>
       <SiteNav profile={profile} user={user} />
-      {children({ user, profile, token })}
+      {children({ user, profile, token, setProfile })}
     </>
   );
 }
