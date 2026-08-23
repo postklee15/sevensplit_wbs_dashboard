@@ -442,9 +442,33 @@ table.tasks {
 .tasks th {
   position: sticky;
   top: 0;
+  z-index: 2;
   background: var(--paper-2);
   font-weight: 500;
   color: var(--muted);
+}
+
+.tasks tr.task-group th {
+  position: sticky;
+  top: 34px;
+  z-index: 1;
+  background: #e8dfcf;
+  color: var(--ink);
+  font-weight: 600;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+
+.tasks tr.unassigned-task td {
+  background: #f7f1e8;
+}
+
+.badge.미지정 {
+  color: var(--over);
+  border-color: #f3c1b8;
+  background: #fbe8e4;
 }
 
 .badge {

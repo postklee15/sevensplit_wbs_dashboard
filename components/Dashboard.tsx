@@ -146,6 +146,14 @@ export function Dashboard({
       }),
     [payload.tasks, leafOnly, service, person, hideDone, query, today],
   );
+  const assignedTasks = useMemo(
+    () => visibleTasks.filter((task) => task.assignees.length > 0),
+    [visibleTasks],
+  );
+  const unassignedTasks = useMemo(
+    () => visibleTasks.filter((task) => task.assignees.length === 0),
+    [visibleTasks],
+  );
 
   const fetched = new Date(payload.fetchedAt).toLocaleString("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -420,7 +428,9 @@ export function Dashboard({
           <h2>
             작업 목록
             {person ? ` · ${isUnassignedRow(person) ? unassignedDisplayName(person) : person}` : ""}
-            {` · ${visibleTasks.length}건`}
+            {unassignedTasks.length > 0 ? ` · 미지정 ${unassignedTasks.length}` : ""}
+            {assignedTasks.length > 0 ? ` · 지정 ${assignedTasks.length}` : ""}
+            {visibleTasks.length === 0 ? " · 0건" : ""}
           </h2>
           {person ? (
             <p className="hint" style={{ padding: "8px 16px 0" }}>
@@ -446,32 +456,26 @@ export function Dashboard({
                     <th>잔여</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {visibleTasks.map((task) => {
-                    const status = taskStatus(task, today);
-                    return (
-                      <tr key={task.id}>
-                        <td>
-                          <span className={`badge ${status}`}>{status}</span>
-                        </td>
-                        <td>{task.service ?? "—"}</td>
-                        <td>{task.attribute ?? "—"}</td>
-                        <td>
-                          <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
-                            {task.title}
-                          </a>
-                          {task.issue ? <div className="issue">{task.issue.slice(0, 80)}</div> : null}
-                        </td>
-                        <td>{task.assignees.join(", ") || UNASSIGNED}</td>
-                        <td>{dateRange(task)}</td>
-                        <td>
-                          {task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}
-                        </td>
-                        <td>{task.effortDays == null && !task.start ? "—" : fmt(remainingEffort(task))}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
+                {unassignedTasks.length > 0 ? (
+                  <tbody>
+                    <tr className="task-group">
+                      <th colSpan={8}>미지정 · {unassignedTasks.length}건</th>
+                    </tr>
+                    {unassignedTasks.map((task) => (
+                      <TaskRow key={task.id} task={task} today={today} />
+                    ))}
+                  </tbody>
+                ) : null}
+                {assignedTasks.length > 0 ? (
+                  <tbody>
+                    <tr className="task-group">
+                      <th colSpan={8}>담당 지정 · {assignedTasks.length}건</th>
+                    </tr>
+                    {assignedTasks.map((task) => (
+                      <TaskRow key={task.id} task={task} today={today} />
+                    ))}
+                  </tbody>
+                ) : null}
               </table>
             )}
           </div>
@@ -534,6 +538,32 @@ function progressRatioPct(task: Task): number {
   if (task.progress == null) return 0;
   if (task.progress <= 1) return task.progress * 100;
   return Math.min(task.progress, 100);
+}
+
+function TaskRow({ task, today }: { task: Task; today: string }) {
+  const status = taskStatus(task, today);
+  const unassigned = task.assignees.length === 0;
+  return (
+    <tr className={unassigned ? "unassigned-task" : undefined}>
+      <td>
+        <span className={`badge ${status}`}>{status}</span>
+      </td>
+      <td>{task.service ?? "—"}</td>
+      <td>{task.attribute ?? "—"}</td>
+      <td>
+        <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
+          {task.title}
+        </a>
+        {task.issue ? <div className="issue">{task.issue.slice(0, 80)}</div> : null}
+      </td>
+      <td>
+        {unassigned ? <span className="badge 미지정">미지정</span> : task.assignees.join(", ")}
+      </td>
+      <td>{dateRange(task)}</td>
+      <td>{task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}</td>
+      <td>{task.effortDays == null && !task.start ? "—" : fmt(remainingEffort(task))}</td>
+    </tr>
+  );
 }
 
 function heatNameLabel(name: string) {
