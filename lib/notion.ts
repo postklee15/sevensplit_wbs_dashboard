@@ -74,7 +74,7 @@ export function parseTask(page: NotionPage): ParsedTask | null {
     assignees: (props["담당자"]?.people ?? [])
       .map((person) => person.name?.trim())
       .filter((name): name is string => Boolean(name)),
-    service: props["서비스"]?.select?.name ?? null,
+    service: props["서비스"]?.select?.name?.trim() || null,
     attribute: attributeValue(props["업무 속성"]),
     progress: numberValue(props["진척도"]),
     allocation: numberValue(props["투입률"]),
@@ -90,7 +90,12 @@ export function parseTask(page: NotionPage): ParsedTask | null {
   };
 }
 
-function withAncestorTitles(tasks: ParsedTask[]): Task[] {
+function ownService(task: { service: string | null } | undefined): string | null {
+  const name = task?.service?.trim();
+  return name || null;
+}
+
+function withTreeFields(tasks: ParsedTask[]): Task[] {
   const byId = new Map(tasks.map((task) => [task.id, task]));
   const parentOf = new Map<string, string>();
 
@@ -119,9 +124,24 @@ function withAncestorTitles(tasks: ParsedTask[]): Task[] {
     return titles.reverse();
   }
 
+  function inheritedServiceOf(id: string): string | null {
+    const own = ownService(byId.get(id));
+    if (own) return own;
+    const seen = new Set<string>([id]);
+    let cursor = parentOf.get(id);
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      const fromParent = ownService(byId.get(cursor));
+      if (fromParent) return fromParent;
+      cursor = parentOf.get(cursor);
+    }
+    return null;
+  }
+
   return tasks.map(({ childIds: _childIds, parentIds: _parentIds, ...task }) => ({
     ...task,
     ancestorTitles: ancestorTitlesOf(task.id),
+    service: inheritedServiceOf(task.id),
   }));
 }
 
@@ -186,5 +206,5 @@ export async function fetchWbsTasks(): Promise<{
     .map(parseTask)
     .filter((task): task is ParsedTask => Boolean(task && task.title));
 
-  return { databaseTitle, tasks: withAncestorTitles(parsed) };
+  return { databaseTitle, tasks: withTreeFields(parsed) };
 }

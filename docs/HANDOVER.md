@@ -189,7 +189,7 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 |---|---|---|
 | 작업명 | title | `title` |
 | 담당자 | people | `assignees` |
-| 서비스 | select | `service` |
+| 서비스 | select | `service` (비어 있으면 상위 트리에서 상속) |
 | 업무 속성 | select / multi_select / rich_text | `attribute` |
 | 진척도 | number (0–1 또는 0–100) | `progress` |
 | 투입률 | number (0–1 또는 0–100) | `allocation` (없으면 부하 계산 시 100%) |
