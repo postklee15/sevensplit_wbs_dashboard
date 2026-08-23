@@ -58,15 +58,19 @@ function attributeValue(prop: NotionProperty | undefined): string | null {
   return text || null;
 }
 
-export function parseTask(page: NotionPage): Task | null {
+type ParsedTask = Task & { childIds: string[]; parentIds: string[] };
+
+export function parseTask(page: NotionPage): ParsedTask | null {
   const props = page.properties ?? {};
   const title = plain(props["작업명"]?.title);
-  const childCount = props["하위 항목"]?.relation?.length ?? 0;
+  const childIds = (props["하위 항목"]?.relation ?? []).map((rel) => rel.id);
+  const parentIds = (props["상위 항목"]?.relation ?? []).map((rel) => rel.id);
 
   return {
     id: page.id,
     title,
     url: page.url ?? "",
+    ancestorTitles: [],
     assignees: (props["담당자"]?.people ?? [])
       .map((person) => person.name?.trim())
       .filter((name): name is string => Boolean(name)),
@@ -80,8 +84,45 @@ export function parseTask(page: NotionPage): Task | null {
     scheduleApproval: props["일정승인"]?.select?.name ?? null,
     deployApproval: props["배포승인"]?.select?.name ?? null,
     issue: plain(props["내용/이슈"]?.rich_text),
-    isLeaf: childCount === 0,
+    isLeaf: childIds.length === 0,
+    childIds,
+    parentIds,
   };
+}
+
+function withAncestorTitles(tasks: ParsedTask[]): Task[] {
+  const byId = new Map(tasks.map((task) => [task.id, task]));
+  const parentOf = new Map<string, string>();
+
+  for (const task of tasks) {
+    for (const childId of task.childIds) {
+      parentOf.set(childId, task.id);
+    }
+  }
+  for (const task of tasks) {
+    const parentId = task.parentIds[0];
+    if (parentId && !parentOf.has(task.id)) {
+      parentOf.set(task.id, parentId);
+    }
+  }
+
+  function ancestorTitlesOf(id: string): string[] {
+    const titles: string[] = [];
+    const seen = new Set<string>();
+    let cursor = parentOf.get(id);
+    while (cursor && !seen.has(cursor)) {
+      seen.add(cursor);
+      const parent = byId.get(cursor);
+      if (parent?.title) titles.push(parent.title);
+      cursor = parentOf.get(cursor);
+    }
+    return titles.reverse();
+  }
+
+  return tasks.map(({ childIds: _childIds, parentIds: _parentIds, ...task }) => ({
+    ...task,
+    ancestorTitles: ancestorTitlesOf(task.id),
+  }));
 }
 
 export async function fetchWbsTasks(): Promise<{
@@ -141,9 +182,9 @@ export async function fetchWbsTasks(): Promise<{
     cursor = json.has_more ? json.next_cursor ?? undefined : undefined;
   } while (cursor);
 
-  const tasks = pages
+  const parsed = pages
     .map(parseTask)
-    .filter((task): task is Task => Boolean(task && task.title));
+    .filter((task): task is ParsedTask => Boolean(task && task.title));
 
-  return { databaseTitle, tasks };
+  return { databaseTitle, tasks: withAncestorTitles(parsed) };
 }

@@ -24,6 +24,7 @@ import {
   weekEndOf,
   weekLabel,
 } from "@/lib/calendar";
+import { TaskTitle, compactTaskLabel } from "@/components/TaskTitle";
 
 const MONTH_LANES = 3;
 const WEEK_LANES = 10;
@@ -39,7 +40,7 @@ function eventClass(task: Task, today: string): string {
 function eventLabel(task: Task): string {
   const project = task.service?.trim() || "—";
   const who = task.assignees.length > 0 ? task.assignees.join(", ") : UNASSIGNED;
-  return `${task.title} / ${project} / ${who}`;
+  return `${compactTaskLabel(task)} / ${project} / ${who}`;
 }
 
 export function WbsCalendar({
@@ -354,9 +355,7 @@ function DayTaskList({
           <li key={task.id}>
             <span className={`badge ${status}`}>{status}</span>
             <div>
-              <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
-                {task.title}
-              </a>
+              <TaskTitle task={task} showIssue={false} />
               <div className="issue">
                 <button
                   type="button"

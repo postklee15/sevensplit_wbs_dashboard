@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AccessProfile } from "@/lib/acl";
+import { TaskTitle } from "@/components/TaskTitle";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -28,6 +29,8 @@ type Payload = {
     id: string;
     title: string;
     url: string;
+    ancestorTitles: string[];
+    issue: string;
     service: string | null;
     assignees: string[];
     start: string | null;
@@ -217,9 +220,7 @@ export function PerformanceBoard({ token }: { token: string; profile: AccessProf
                         <tr key={task.id}>
                           <td>{task.service ?? "—"}</td>
                           <td>
-                            <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
-                              {task.title}
-                            </a>
+                            <TaskTitle task={task} />
                           </td>
                           <td>{task.assignees.join(", ") || "—"}</td>
                           <td>

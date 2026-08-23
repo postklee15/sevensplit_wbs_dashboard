@@ -152,7 +152,8 @@ export function filterTasks(
       if (!matchesPerson(task, opts.person)) return false;
     }
     if (q) {
-      const hay = `${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue}`.toLowerCase();
+      const path = (task.ancestorTitles ?? []).join(" ");
+      const hay = `${path} ${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;

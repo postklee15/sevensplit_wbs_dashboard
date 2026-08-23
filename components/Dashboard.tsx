@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
+import { TaskTitle } from "@/components/TaskTitle";
 import {
   DAILY_CAPACITY,
   NO_SERVICE,
@@ -194,7 +195,7 @@ export function Dashboard({
             </button>
           </div>
           <input
-            placeholder="작업명, 속성, 이슈 검색"
+            placeholder="상위 작업, 작업명, 속성, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -551,10 +552,7 @@ function TaskRow({ task, today }: { task: Task; today: string }) {
       <td>{task.service ?? "—"}</td>
       <td>{task.attribute ?? "—"}</td>
       <td>
-        <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
-          {task.title}
-        </a>
-        {task.issue ? <div className="issue">{task.issue.slice(0, 80)}</div> : null}
+        <TaskTitle task={task} />
       </td>
       <td>
         {unassigned ? <span className="badge 미지정">미지정</span> : task.assignees.join(", ")}

@@ -2,6 +2,8 @@ export type Task = {
   id: string;
   title: string;
   url: string;
+  /** 루트 → 직계 상위. 자신은 제외. */
+  ancestorTitles: string[];
   assignees: string[];
   service: string | null;
   attribute: string | null;

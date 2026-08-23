@@ -14,6 +14,7 @@ import {
   todayKst,
 } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
+import { TaskTitle } from "@/components/TaskTitle";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -255,7 +256,7 @@ export function MyWorkBoard({
         </div>
         <div className="controls">
           <input
-            placeholder="작업명, 속성, 이슈 검색"
+            placeholder="상위 작업, 작업명, 속성, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -359,10 +360,7 @@ export function MyWorkBoard({
                       <td>{task.service ?? "—"}</td>
                       <td>{task.attribute ?? "—"}</td>
                       <td>
-                        <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
-                          {task.title}
-                        </a>
-                        {task.issue ? <div className="issue">{task.issue.slice(0, 80)}</div> : null}
+                        <TaskTitle task={task} />
                       </td>
                       <td>{dateRange(task)}</td>
                       <td>

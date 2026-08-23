@@ -26,7 +26,7 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김.
 
-부하 보기 작업 목록 열: 상태 · 서비스 · **속성** · 작업 · 담당 · 일정 · 진척 · 잔여. 목록은 **미지정 / 담당 지정** 구간으로 나눔. 잔여·히트맵은 투입률을 곱함. 히트맵은 **주간 / 일간**(주 단위 월–금).
+부하 보기 작업 목록 열: 상태 · 서비스 · **속성** · 작업 · 담당 · 일정 · 진척 · 잔여. 작업 칸은 **상위 제목 경로 + 리프 제목 + 내용/이슈**. 목록은 **미지정 / 담당 지정** 구간으로 나눔. 잔여·히트맵은 투입률을 곱함. 히트맵은 **주간 / 일간**(주 단위 월–금).
 
 라이브: https://sevensplit-wbs-dashboard.web.app
 
@@ -195,7 +195,7 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 | 투입률 | number (0–1 또는 0–100) | `allocation` (없으면 부하 계산 시 100%) |
 | 소요일 | number | `effortDays` |
 | 일정 | date | `start` / `end` |
-| 상위/하위 항목 | relation | `isLeaf` = 하위 항목 0건 |
+| 상위/하위 항목 | relation | `isLeaf` = 하위 항목 0건. `ancestorTitles` = 루트→직계 상위 제목 |
 | 일정승인, 배포승인 | select | 일정승인은 `/approval`에서 미지정·승인·반려·보류로 구분. 빈 값은 미지정 |
 | 내용/이슈 | rich_text | `issue` |
 | URL | url | 페이지 URL은 Notion page url 사용 |

@@ -23,6 +23,8 @@ export type PerformancePayload = {
     id: string;
     title: string;
     url: string;
+    ancestorTitles: string[];
+    issue: string;
     service: string | null;
     assignees: string[];
     start: string | null;
@@ -108,6 +110,8 @@ export function buildPerformance(
         id: task.id,
         title: task.title,
         url: task.url,
+        ancestorTitles: task.ancestorTitles ?? [],
+        issue: task.issue ?? "",
         service: task.service,
         assignees: task.assignees,
         start: task.start,
