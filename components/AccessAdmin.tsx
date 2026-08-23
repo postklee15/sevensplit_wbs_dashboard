@@ -81,6 +81,20 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
     void load();
   }, [load]);
 
+  async function applyPatch(
+    user: AccessProfile,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId">>,
+  ) {
+    const res = await fetch("/api/acl", {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ uid: user.uid, ...patch }),
+    });
+    const body = (await res.json()) as { profile?: AccessProfile; error?: string };
+    if (!res.ok || !body.profile) throw new Error(body.error || "저장 실패");
+    setUsers((prev) => prev.map((row) => (row.uid === user.uid ? body.profile! : row)));
+  }
+
   async function save(
     user: AccessProfile,
     patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId">>,
@@ -88,16 +102,32 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
     setBusy(user.uid);
     setError(null);
     try {
-      const res = await fetch("/api/acl", {
-        method: "PATCH",
-        headers,
-        body: JSON.stringify({ uid: user.uid, ...patch }),
-      });
-      const body = (await res.json()) as { profile?: AccessProfile; error?: string };
-      if (!res.ok || !body.profile) throw new Error(body.error || "저장 실패");
-      setUsers((prev) => prev.map((row) => (row.uid === user.uid ? body.profile! : row)));
+      await applyPatch(user, patch);
     } catch (err) {
       setError(err instanceof Error ? err.message : "권한을 저장하지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function fillEmptySlackIds() {
+    const missing = users.filter((user) => !user.slackMemberId.trim());
+    if (missing.length === 0) {
+      setError("채울 Slack ID가 없습니다. 이미 모두 들어 있습니다.");
+      return;
+    }
+    setBusy("slack-fill");
+    setError(null);
+    const failed: string[] = [];
+    try {
+      for (const user of missing) {
+        try {
+          await applyPatch(user, { slackMemberId: user.email });
+        } catch (err) {
+          failed.push(`${user.email}: ${err instanceof Error ? err.message : "실패"}`);
+        }
+      }
+      if (failed.length > 0) setError(failed.join(" · "));
     } finally {
       setBusy(null);
     }
@@ -154,11 +184,14 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
           <p className="kicker">Split Invest · 접근 권한</p>
           <h1>사용자 권한</h1>
           <p className="sub">
-            {me.email} 슈퍼 관리자. Slack 멤버 ID가 비어 있으면 로그인 이메일로 워크스페이스 사용자를 찾습니다. 서비스 PM은
-            미지정 작업 DM을 받습니다.
+            {me.email} 슈퍼 관리자. Slack 칸에 이메일을 넣거나 「이메일로 찾기」를 누르면 멤버 ID를 채웁니다. 칸을 비워 두면
+            보낼 때 로그인 이메일로 찾습니다. 서비스 PM은 미지정 작업 DM을 받습니다.
           </p>
         </div>
         <div className="controls">
+          <button className="btn" type="button" onClick={() => void fillEmptySlackIds()} disabled={busy !== null}>
+            {busy === "slack-fill" ? "Slack ID 채우는 중…" : "빈 Slack ID 채우기"}
+          </button>
           <button className="btn" type="button" onClick={() => void load()} disabled={busy !== null}>
             목록 새로고침
           </button>
@@ -190,17 +223,28 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                   <td>{user.workName || "—"}</td>
                   <td>{user.isSuperAdmin ? "슈퍼 관리자" : "구성원"}</td>
                   <td>
-                    <input
-                      className="cell-input"
-                      defaultValue={user.slackMemberId}
-                      placeholder="U…"
-                      disabled={busy === user.uid}
-                      onBlur={(e) => {
-                        const next = e.target.value.trim();
-                        if (next === user.slackMemberId) return;
-                        void save(user, { slackMemberId: next });
-                      }}
-                    />
+                    <div className="slack-id-cell">
+                      <input
+                        key={`${user.uid}:${user.slackMemberId}`}
+                        className="cell-input"
+                        defaultValue={user.slackMemberId}
+                        placeholder="U… 또는 이메일"
+                        disabled={busy === user.uid || busy === "slack-fill"}
+                        onBlur={(e) => {
+                          const next = e.target.value.trim();
+                          if (next === user.slackMemberId) return;
+                          void save(user, { slackMemberId: next });
+                        }}
+                      />
+                      <button
+                        className="btn compact"
+                        type="button"
+                        disabled={busy !== null}
+                        onClick={() => void save(user, { slackMemberId: user.email })}
+                      >
+                        이메일로 찾기
+                      </button>
+                    </div>
                   </td>
                   <td>
                     <label className="toggle">

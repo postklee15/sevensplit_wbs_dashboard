@@ -521,6 +521,23 @@ table.tasks {
   background: var(--paper);
 }
 
+.slack-id-cell {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.slack-id-cell .cell-input {
+  width: 9rem;
+}
+
+.btn.compact {
+  padding: 4px 10px;
+  font-size: 12px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
 .approval-panel {
   margin-bottom: 16px;
 }

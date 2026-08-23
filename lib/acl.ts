@@ -10,7 +10,7 @@ export type AccessProfile = {
   workName: string;
   canDashboard: boolean;
   canPerformance: boolean;
-  /** Slack 멤버 ID. 비어 있으면 이메일로 조회. 하트비트가 덮어쓰지 않음. */
+  /** Slack 멤버 ID(`U…`). 비어 있으면 발송 시 로그인 이메일로 조회. 권한 화면에서 이메일로 채워 저장할 수 있음. 하트비트가 덮어쓰지 않음. */
   slackMemberId: string;
   isSuperAdmin: boolean;
   createdAt: string | null;

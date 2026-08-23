@@ -6,6 +6,7 @@ import {
 } from "./acl";
 import { boolField, getDocument, listDocuments, patchDocument, strField } from "./firestoreRest";
 import { isUnassignedRow } from "./metrics";
+import { resolveSlackMemberId } from "./slack";
 
 const COLLECTION = "users";
 
@@ -112,7 +113,9 @@ export async function updateAccess(
   }
   const current = toProfile(uid, existing.fields, "");
   const slackMemberId =
-    patch.slackMemberId !== undefined ? normalizeSlackMemberId(patch.slackMemberId) : current.slackMemberId;
+    patch.slackMemberId !== undefined
+      ? await resolveSlackMemberId(patch.slackMemberId)
+      : current.slackMemberId;
   if (current.isSuperAdmin) {
     if (patch.slackMemberId === undefined) return current;
     await patchDocument(token, COLLECTION, uid, { slackMemberId }, ["slackMemberId"]);
@@ -127,15 +130,6 @@ export async function updateAccess(
   if (patch.slackMemberId !== undefined) mask.push("slackMemberId");
   await patchDocument(token, COLLECTION, uid, next, mask);
   return { ...current, ...next };
-}
-
-function normalizeSlackMemberId(value: string): string {
-  const id = value.trim();
-  if (!id) return "";
-  if (!/^U[A-Z0-9]+$/i.test(id)) {
-    throw new Error("Slack 멤버 ID는 U로 시작하는 값이어야 합니다.");
-  }
-  return id.slice(0, 31);
 }
 
 export async function updateWorkName(
