@@ -1,6 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { Pager, PageSizeSelect } from "@/components/Pager";
+import { pageSlice } from "@/lib/pager";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { TaskTitle } from "@/components/TaskTitle";
@@ -81,6 +83,9 @@ export function Dashboard({
   const [loadWeek, setLoadWeek] = useState<LoadWeekIndex>(0);
   const [heatGrain, setHeatGrain] = useState<HeatGrain>("week");
   const [heatWeek, setHeatWeek] = useState(0);
+  const [pageSize, setPageSize] = useState(20);
+  const [unassignedPage, setUnassignedPage] = useState(1);
+  const [assignedPage, setAssignedPage] = useState(1);
 
   const scoped = useMemo(
     () =>
@@ -154,6 +159,20 @@ export function Dashboard({
   const unassignedTasks = useMemo(
     () => visibleTasks.filter((task) => task.assignees.length === 0),
     [visibleTasks],
+  );
+
+  useEffect(() => {
+    setUnassignedPage(1);
+    setAssignedPage(1);
+  }, [leafOnly, hideDone, service, person, query, pageSize]);
+
+  const pagedUnassigned = useMemo(
+    () => pageSlice(unassignedTasks, unassignedPage, pageSize),
+    [unassignedTasks, unassignedPage, pageSize],
+  );
+  const pagedAssigned = useMemo(
+    () => pageSlice(assignedTasks, assignedPage, pageSize),
+    [assignedTasks, assignedPage, pageSize],
   );
 
   const fetched = new Date(payload.fetchedAt).toLocaleString("ko-KR", {
@@ -426,13 +445,18 @@ export function Dashboard({
 
       <section className="load-stack">
         <div className="panel tasks-panel">
-          <h2>
-            작업 목록
-            {person ? ` · ${isUnassignedRow(person) ? unassignedDisplayName(person) : person}` : ""}
-            {unassignedTasks.length > 0 ? ` · 미지정 ${unassignedTasks.length}` : ""}
-            {assignedTasks.length > 0 ? ` · 지정 ${assignedTasks.length}` : ""}
-            {visibleTasks.length === 0 ? " · 0건" : ""}
-          </h2>
+          <div className="panel-head">
+            <h2>
+              작업 목록
+              {person ? ` · ${isUnassignedRow(person) ? unassignedDisplayName(person) : person}` : ""}
+              {unassignedTasks.length > 0 ? ` · 미지정 ${unassignedTasks.length}` : ""}
+              {assignedTasks.length > 0 ? ` · 지정 ${assignedTasks.length}` : ""}
+              {visibleTasks.length === 0 ? " · 0건" : ""}
+            </h2>
+            {visibleTasks.length > 0 ? (
+              <PageSizeSelect value={pageSize} onChange={setPageSize} />
+            ) : null}
+          </div>
           {person ? (
             <p className="hint" style={{ padding: "8px 16px 0" }}>
               <button className="chip" type="button" onClick={() => setPerson(null)}>
@@ -440,46 +464,50 @@ export function Dashboard({
               </button>
             </p>
           ) : null}
-          <div className="table-wrap">
-            {visibleTasks.length === 0 ? (
-              <p className="empty">조건에 맞는 작업이 없습니다.</p>
-            ) : (
-              <table className="tasks">
-                <thead>
-                  <tr>
-                    <th>상태</th>
-                    <th>서비스</th>
-                    <th>속성</th>
-                    <th>작업</th>
-                    <th>담당</th>
-                    <th>일정</th>
-                    <th>진척</th>
-                    <th>잔여</th>
-                  </tr>
-                </thead>
-                {unassignedTasks.length > 0 ? (
-                  <tbody>
-                    <tr className="task-group">
-                      <th colSpan={8}>미지정 · {unassignedTasks.length}건</th>
-                    </tr>
-                    {unassignedTasks.map((task) => (
-                      <TaskRow key={task.id} task={task} today={today} />
-                    ))}
-                  </tbody>
-                ) : null}
-                {assignedTasks.length > 0 ? (
-                  <tbody>
-                    <tr className="task-group">
-                      <th colSpan={8}>담당 지정 · {assignedTasks.length}건</th>
-                    </tr>
-                    {assignedTasks.map((task) => (
-                      <TaskRow key={task.id} task={task} today={today} />
-                    ))}
-                  </tbody>
-                ) : null}
-              </table>
-            )}
-          </div>
+          {visibleTasks.length === 0 ? (
+            <p className="empty">조건에 맞는 작업이 없습니다.</p>
+          ) : (
+            <>
+              {unassignedTasks.length > 0 ? (
+                <>
+                  <div className="table-wrap">
+                    <TaskTable
+                      heading={`미지정 · ${unassignedTasks.length}건`}
+                      tasks={pagedUnassigned.items}
+                      today={today}
+                    />
+                  </div>
+                  <Pager
+                    page={pagedUnassigned.page}
+                    pages={pagedUnassigned.pages}
+                    total={pagedUnassigned.total}
+                    from={pagedUnassigned.from}
+                    to={pagedUnassigned.to}
+                    onPage={setUnassignedPage}
+                  />
+                </>
+              ) : null}
+              {assignedTasks.length > 0 ? (
+                <>
+                  <div className="table-wrap">
+                    <TaskTable
+                      heading={`담당 지정 · ${assignedTasks.length}건`}
+                      tasks={pagedAssigned.items}
+                      today={today}
+                    />
+                  </div>
+                  <Pager
+                    page={pagedAssigned.page}
+                    pages={pagedAssigned.pages}
+                    total={pagedAssigned.total}
+                    from={pagedAssigned.from}
+                    to={pagedAssigned.to}
+                    onPage={setAssignedPage}
+                  />
+                </>
+              ) : null}
+            </>
+          )}
         </div>
 
         <div className="panel rank-panel">
@@ -541,15 +569,50 @@ function progressRatioPct(task: Task): number {
   return Math.min(task.progress, 100);
 }
 
+function TaskTable({
+  heading,
+  tasks,
+  today,
+}: {
+  heading: string;
+  tasks: Task[];
+  today: string;
+}) {
+  return (
+    <table className="tasks">
+      <thead>
+        <tr>
+          <th className="col-status">상태</th>
+          <th className="col-service">서비스</th>
+          <th>속성</th>
+          <th>작업</th>
+          <th>담당</th>
+          <th>일정</th>
+          <th>진척</th>
+          <th>잔여</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr className="task-group">
+          <th colSpan={8}>{heading}</th>
+        </tr>
+        {tasks.map((task) => (
+          <TaskRow key={task.id} task={task} today={today} />
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 function TaskRow({ task, today }: { task: Task; today: string }) {
   const status = taskStatus(task, today);
   const unassigned = task.assignees.length === 0;
   return (
     <tr className={unassigned ? "unassigned-task" : undefined}>
-      <td>
+      <td className="col-status">
         <span className={`badge ${status}`}>{status}</span>
       </td>
-      <td>{task.service ?? "—"}</td>
+      <td className="col-service">{task.service ?? "—"}</td>
       <td>{task.attribute ?? "—"}</td>
       <td>
         <TaskTitle task={task} />

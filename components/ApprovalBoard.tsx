@@ -17,6 +17,8 @@ import {
   type ScheduleApproval,
 } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
+import { Pager, PageSizeSelect } from "@/components/Pager";
+import { pageSlice } from "@/lib/pager";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -47,6 +49,8 @@ export function ApprovalBoard({ token }: { token: string }) {
   const [service, setService] = useState<string | null>(null);
   const [query, setQuery] = useState("");
   const [approval, setApproval] = useState<ScheduleApproval | null>(null);
+  const [pageSize, setPageSize] = useState(20);
+  const [pageByKey, setPageByKey] = useState<Partial<Record<ScheduleApproval, number>>>({});
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -99,6 +103,10 @@ export function ApprovalBoard({ token }: { token: string }) {
     [scoped, approval],
   );
 
+  useEffect(() => {
+    setPageByKey({});
+  }, [leafOnly, hideDone, service, query, approval, pageSize]);
+
   const fetched = payload
     ? new Date(payload.fetchedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
     : "";
@@ -137,6 +145,7 @@ export function ApprovalBoard({ token }: { token: string }) {
           <button className="btn" type="button" disabled={loading} onClick={() => void load()}>
             {loading ? "새로고침 중" : "노션 다시 읽기"}
           </button>
+          <PageSizeSelect value={pageSize} onChange={setPageSize} />
         </div>
       </header>
 
@@ -194,7 +203,9 @@ export function ApprovalBoard({ token }: { token: string }) {
         <p className="empty">조건에 맞는 작업이 없습니다.</p>
       ) : null}
 
-      {groups.map((group) => (
+      {groups.map((group) => {
+        const paged = pageSlice(group.tasks, pageByKey[group.key] ?? 1, pageSize);
+        return (
         <section key={group.key} className="panel tasks-panel approval-panel">
           <h2>
             {group.key}
@@ -207,9 +218,9 @@ export function ApprovalBoard({ token }: { token: string }) {
               <table className="tasks">
                 <thead>
                   <tr>
-                    <th>일정승인</th>
-                    <th>상태</th>
-                    <th>서비스</th>
+                    <th className="col-approval">일정승인</th>
+                    <th className="col-status">상태</th>
+                    <th className="col-service">서비스</th>
                     <th>속성</th>
                     <th>작업</th>
                     <th>담당</th>
@@ -219,19 +230,19 @@ export function ApprovalBoard({ token }: { token: string }) {
                   </tr>
                 </thead>
                 <tbody>
-                  {group.tasks.map((task) => {
+                  {paged.items.map((task) => {
                     const status = taskStatus(task, today);
                     const ap = scheduleApprovalOf(task);
                     const unassigned = task.assignees.length === 0;
                     return (
                       <tr key={task.id} className={unassigned ? "unassigned-task" : undefined}>
-                        <td>
+                        <td className="col-approval">
                           <span className={`badge ap-${ap}`}>{ap}</span>
                         </td>
-                        <td>
+                        <td className="col-status">
                           <span className={`badge ${status}`}>{status}</span>
                         </td>
-                        <td>{task.service ?? "—"}</td>
+                        <td className="col-service">{task.service ?? "—"}</td>
                         <td>{task.attribute ?? "—"}</td>
                         <td>
                           <TaskTitle task={task} />
@@ -257,8 +268,21 @@ export function ApprovalBoard({ token }: { token: string }) {
               </table>
             )}
           </div>
+          {group.tasks.length > 0 ? (
+            <Pager
+              page={paged.page}
+              pages={paged.pages}
+              total={paged.total}
+              from={paged.from}
+              to={paged.to}
+              onPage={(page) =>
+                setPageByKey((prev) => ({ ...prev, [group.key]: page }))
+              }
+            />
+          ) : null}
         </section>
-      ))}
+        );
+      })}
     </main>
   );
 }

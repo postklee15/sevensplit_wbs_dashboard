@@ -507,6 +507,60 @@ table.tasks {
 .approval-panel {
   margin-bottom: 16px;
 }
+.tasks .col-status,
+.tasks .col-service,
+.tasks .col-approval {
+  white-space: nowrap;
+  width: 1%;
+  vertical-align: middle;
+}
+
+.badge {
+  white-space: nowrap;
+}
+
+.pager {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  padding: 10px 16px 14px;
+  font-size: 13px;
+  color: var(--muted);
+  border-top: 1px solid var(--line);
+}
+
+.pager-nav {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pager-size {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.pager-size select {
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.tasks-panel .table-wrap {
+  max-height: none;
+}
+
+.approval-panel .table-wrap {
+  max-height: none;
+}
+
 
 .approval-panel h2 {
   padding-bottom: 8px;
@@ -514,6 +568,7 @@ table.tasks {
 
 .badge {
   display: inline-block;
+  white-space: nowrap;
   font-size: 11px;
   padding: 2px 7px;
   border: 1px solid var(--line);
