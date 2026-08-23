@@ -145,7 +145,6 @@ export function ApprovalBoard({ token }: { token: string }) {
           <button className="btn" type="button" disabled={loading} onClick={() => void load()}>
             {loading ? "새로고침 중" : "노션 다시 읽기"}
           </button>
-          <PageSizeSelect value={pageSize} onChange={setPageSize} />
         </div>
       </header>
 
@@ -207,10 +206,15 @@ export function ApprovalBoard({ token }: { token: string }) {
         const paged = pageSlice(group.tasks, pageByKey[group.key] ?? 1, pageSize);
         return (
         <section key={group.key} className="panel tasks-panel approval-panel">
-          <h2>
-            {group.key}
-            {` · ${group.tasks.length}건`}
-          </h2>
+          <div className="panel-head">
+            <h2>
+              {group.key}
+              {` · ${group.tasks.length}건`}
+            </h2>
+            {group.tasks.length > 0 ? (
+              <PageSizeSelect value={pageSize} onChange={setPageSize} />
+            ) : null}
+          </div>
           <div className="table-wrap">
             {group.tasks.length === 0 ? (
               <p className="empty">이 상태의 작업이 없습니다.</p>
