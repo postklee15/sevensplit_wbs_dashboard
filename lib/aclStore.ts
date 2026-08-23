@@ -22,6 +22,7 @@ function toProfile(
     workName: strField(fields, "workName").trim(),
     canDashboard: boolField(fields, "canDashboard", true),
     canPerformance: boolField(fields, "canPerformance", false),
+    slackMemberId: strField(fields, "slackMemberId").trim(),
     isSuperAdmin: isSuperAdminEmail(email),
     createdAt: strField(fields, "createdAt") || null,
     lastSeenAt: strField(fields, "lastSeenAt") || null,
@@ -49,10 +50,20 @@ export async function heartbeatUser(opts: {
         workName: "",
         canDashboard: true,
         canPerformance: superAdmin,
+        slackMemberId: "",
         createdAt: now,
         lastSeenAt: now,
       },
-      ["email", "displayName", "workName", "canDashboard", "canPerformance", "createdAt", "lastSeenAt"],
+      [
+        "email",
+        "displayName",
+        "workName",
+        "canDashboard",
+        "canPerformance",
+        "slackMemberId",
+        "createdAt",
+        "lastSeenAt",
+      ],
     );
     return applySuperAdmin({
       uid: opts.uid,
@@ -61,6 +72,7 @@ export async function heartbeatUser(opts: {
       workName: "",
       canDashboard: true,
       canPerformance: superAdmin,
+      slackMemberId: "",
       isSuperAdmin: superAdmin,
       createdAt: now,
       lastSeenAt: now,
@@ -92,20 +104,38 @@ export async function listProfiles(token: string): Promise<AccessProfile[]> {
 export async function updateAccess(
   token: string,
   uid: string,
-  patch: { canDashboard?: boolean; canPerformance?: boolean },
+  patch: { canDashboard?: boolean; canPerformance?: boolean; slackMemberId?: string },
 ): Promise<AccessProfile> {
   const existing = await getDocument(token, COLLECTION, uid);
   if (!existing) {
     throw new Error("해당 사용자를 찾을 수 없습니다. 상대방이 한 번 로그인한 뒤에 권한을 줄 수 있습니다.");
   }
   const current = toProfile(uid, existing.fields, "");
-  if (current.isSuperAdmin) return current;
+  const slackMemberId =
+    patch.slackMemberId !== undefined ? normalizeSlackMemberId(patch.slackMemberId) : current.slackMemberId;
+  if (current.isSuperAdmin) {
+    if (patch.slackMemberId === undefined) return current;
+    await patchDocument(token, COLLECTION, uid, { slackMemberId }, ["slackMemberId"]);
+    return { ...current, slackMemberId };
+  }
   const next = {
     canDashboard: patch.canDashboard ?? current.canDashboard,
     canPerformance: patch.canPerformance ?? current.canPerformance,
+    slackMemberId,
   };
-  await patchDocument(token, COLLECTION, uid, next, ["canDashboard", "canPerformance"]);
+  const mask = ["canDashboard", "canPerformance"];
+  if (patch.slackMemberId !== undefined) mask.push("slackMemberId");
+  await patchDocument(token, COLLECTION, uid, next, mask);
   return { ...current, ...next };
+}
+
+function normalizeSlackMemberId(value: string): string {
+  const id = value.trim();
+  if (!id) return "";
+  if (!/^U[A-Z0-9]+$/i.test(id)) {
+    throw new Error("Slack 멤버 ID는 U로 시작하는 값이어야 합니다.");
+  }
+  return id.slice(0, 31);
 }
 
 export async function updateWorkName(

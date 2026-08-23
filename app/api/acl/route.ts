@@ -40,6 +40,7 @@ export async function PATCH(request: Request) {
     uid?: string;
     canDashboard?: boolean;
     canPerformance?: boolean;
+    slackMemberId?: string;
   };
   if (!body.uid) {
     return NextResponse.json({ error: "uid가 필요합니다." }, { status: 400 });
@@ -49,6 +50,7 @@ export async function PATCH(request: Request) {
     const profile = await updateAccess(auth.token, body.uid, {
       canDashboard: body.canDashboard,
       canPerformance: body.canPerformance,
+      slackMemberId: body.slackMemberId,
     });
     return NextResponse.json({ profile });
   } catch (error) {

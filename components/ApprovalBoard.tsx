@@ -171,7 +171,7 @@ export function ApprovalBoard({ token }: { token: string }) {
         ))}
       </section>
 
-      <section className="kpis cols-4" aria-label="일정승인">
+      <section className="kpis" aria-label="일정승인">
         {SCHEDULE_APPROVALS.map((key) => (
           <button
             key={key}

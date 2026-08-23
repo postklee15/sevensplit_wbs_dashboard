@@ -12,8 +12,11 @@ rules_version = '2';
 //   workName (string, optional) — 노션 담당자 이름. 본인이 프로필에서 설정
 //   canDashboard (bool, required)
 //   canPerformance (bool, required)
+//   slackMemberId (string, optional) — Slack U… ID. 하트비트가 덮지 않음
 //   createdAt (string ISO, required on create)
 //   lastSeenAt (string ISO, required)
+// Collection: projectPms — 서비스 → PM uid (슈퍼관리자만)
+// Collection: alertLogs — 하루 1통 로그 (슈퍼관리자만)
 // Super admin emails are hardcoded in rules; role flags from the client
 // cannot grant super admin.
 //
@@ -56,7 +59,9 @@ service cloud.firestore {
         && data.createdAt is string
         && data.lastSeenAt is string
         && (!('workName' in data)
-          || (data.workName is string && data.workName.size() < 80));
+          || (data.workName is string && data.workName.size() < 80))
+        && (!('slackMemberId' in data)
+          || (data.slackMemberId is string && data.slackMemberId.size() < 32));
     }
 
     match /users/{uid} {
@@ -77,6 +82,7 @@ service cloud.firestore {
             && request.resource.data.canDashboard == resource.data.canDashboard
             && request.resource.data.canPerformance == resource.data.canPerformance
             && request.resource.data.createdAt == resource.data.createdAt
+            && request.resource.data.get('slackMemberId', '') == resource.data.get('slackMemberId', '')
           )
           || (
             isSuperAdmin()
@@ -85,6 +91,14 @@ service cloud.firestore {
           )
         );
       allow delete: if false;
+    }
+
+    match /projectPms/{id} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /alertLogs/{id} {
+      allow read, write: if isSuperAdmin();
     }
   }
 }

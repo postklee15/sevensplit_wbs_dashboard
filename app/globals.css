@@ -504,6 +504,23 @@ table.tasks {
   background: #f8ead6;
 }
 
+.badge.ap-지연 {
+  color: #9a3412;
+  border-color: #e8c4b8;
+  background: #f8e8e4;
+}
+
+.cell-input {
+  width: 11rem;
+  max-width: 100%;
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--paper);
+}
+
 .approval-panel {
   margin-bottom: 16px;
 }
