@@ -75,20 +75,52 @@ export async function resolveSlackMemberId(raw: string): Promise<string> {
   return id.slice(0, 31);
 }
 
-export async function sendSlackDm(token: string, slackUserId: string, text: string): Promise<void> {
-  const opened = await slackCall<{ channel?: { id?: string } }>(token, "conversations.open", {
-    users: slackUserId,
-  });
-  if (!opened.ok || !opened.channel?.id) {
-    throw new Error(`Slack DM 채널을 열지 못했습니다 (${opened.error ?? "unknown"})`);
+function explainSlackPostError(error: string | undefined): string {
+  if (error === "messages_tab_disabled") {
+    return [
+      "Slack 앱의 Messages Tab이 꺼져 있어 DM을 보낼 수 없습니다.",
+      "api.slack.com/apps → 해당 앱 → App Home → Show Tabs에서 Messages Tab을 켜고",
+      "Allow users to send Slash commands and messages from the messages tab을 선택한 뒤",
+      "OAuth & Permissions에서 워크스페이스에 앱을 다시 설치하세요.",
+    ].join(" ");
   }
-  const posted = await slackCall(token, "chat.postMessage", {
-    channel: opened.channel.id,
+  if (error === "cannot_dm_bot" || error === "user_not_found") {
+    return `Slack 사용자에게 DM을 열 수 없습니다 (${error}). 봇이 아니라 사람 멤버 ID인지 확인하세요.`;
+  }
+  if (error === "account_inactive") {
+    return "Slack 계정이 비활성입니다. 워크스페이스에서 해당 멤버 상태를 확인하세요.";
+  }
+  if (error === "missing_scope") {
+    return "Slack 앱에 chat:write 또는 im:write 스코프가 없습니다. 넣은 뒤 워크스페이스에 다시 설치하세요.";
+  }
+  return `Slack 메시지 전송 실패 (${error ?? "unknown"})`;
+}
+
+async function postSlackMessage(
+  token: string,
+  channel: string,
+  text: string,
+): Promise<{ ok: boolean; error?: string }> {
+  return slackCall(token, "chat.postMessage", {
+    channel,
     text,
     unfurl_links: false,
     unfurl_media: false,
   });
+}
+
+export async function sendSlackDm(token: string, slackUserId: string, text: string): Promise<void> {
+  let posted = await postSlackMessage(token, slackUserId, text);
+  if (!posted.ok && (posted.error === "channel_not_found" || posted.error === "not_in_channel")) {
+    const opened = await slackCall<{ channel?: { id?: string } }>(token, "conversations.open", {
+      users: slackUserId,
+    });
+    if (!opened.ok || !opened.channel?.id) {
+      throw new Error(`Slack DM 채널을 열지 못했습니다 (${opened.error ?? "unknown"})`);
+    }
+    posted = await postSlackMessage(token, opened.channel.id, text);
+  }
   if (!posted.ok) {
-    throw new Error(`Slack 메시지 전송 실패 (${posted.error ?? "unknown"})`);
+    throw new Error(explainSlackPostError(posted.error));
   }
 }

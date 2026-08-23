@@ -16,7 +16,7 @@
 
 **이미 있는 것 (다시 넣지 않음):** `NOTION_TOKEN`, `NOTION_DATABASE_ID`, `FIREBASE_SERVICE_ACCOUNT`
 
-Slack 앱 스코프: `chat:write`, `im:write`, `users:read.email`. 워크스페이스에 앱을 설치한다. Incoming Webhook·사람별 URL은 쓰지 않는다.
+Slack 앱 스코프: `chat:write`, `im:write`, `users:read.email`. **App Home → Messages Tab**을 켠다(끄면 `messages_tab_disabled`). 워크스페이스에 앱을 설치한다. Incoming Webhook·사람별 URL은 쓰지 않는다.
 
 ---
 
