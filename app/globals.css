@@ -389,11 +389,20 @@ button.kpi.on {
   gap: 10px;
   align-items: center;
   padding: 10px 16px;
+  appearance: none;
+  border: 0;
   border-top: 1px solid var(--line);
+  border-radius: 0;
+  box-shadow: none;
+  outline: none;
   cursor: pointer;
   text-align: left;
   background: transparent;
   width: 100%;
+}
+
+.person:focus {
+  outline: none;
 }
 
 .person:first-of-type {
