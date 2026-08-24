@@ -83,7 +83,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
 
   async function applyPatch(
     user: AccessProfile,
-    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId">>,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName">>,
   ) {
     const res = await fetch("/api/acl", {
       method: "PATCH",
@@ -97,7 +97,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
 
   async function save(
     user: AccessProfile,
-    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId">>,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName">>,
   ) {
     setBusy(user.uid);
     setError(null);
@@ -184,8 +184,9 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
           <p className="kicker">Split Invest · 접근 권한</p>
           <h1>사용자 권한</h1>
           <p className="sub">
-            {me.email} 슈퍼 관리자. Slack 칸에 이메일을 넣거나 「이메일로 찾기」를 누르면 멤버 ID를 채웁니다. 칸을 비워 두면
-            보낼 때 로그인 이메일로 찾습니다. 서비스 PM은 미지정 작업 DM을 받습니다.
+            {me.email} 슈퍼 관리자. 업무 이름은 노션 담당자와 같게 직접 넣을 수 있습니다. Slack 칸에 이메일을 넣거나
+            「이메일로 찾기」를 누르면 멤버 ID를 채웁니다. 칸을 비워 두면 보낼 때 로그인 이메일로 찾습니다. 서비스 PM은
+            미지정 작업 DM을 받습니다.
           </p>
         </div>
         <div className="controls">
@@ -220,7 +221,20 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                 <tr key={user.uid}>
                   <td>{user.email}</td>
                   <td>{user.displayName || "—"}</td>
-                  <td>{user.workName || "—"}</td>
+                  <td>
+                    <input
+                      key={`${user.uid}:work:${user.workName}`}
+                      className="cell-input"
+                      defaultValue={user.workName}
+                      placeholder="노션 담당자 이름"
+                      disabled={busy === user.uid}
+                      onBlur={(e) => {
+                        const next = e.target.value.trim();
+                        if (next === user.workName) return;
+                        void save(user, { workName: next });
+                      }}
+                    />
+                  </td>
                   <td>{user.isSuperAdmin ? "슈퍼 관리자" : "구성원"}</td>
                   <td>
                     <div className="slack-id-cell">

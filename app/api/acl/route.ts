@@ -41,6 +41,7 @@ export async function PATCH(request: Request) {
     canDashboard?: boolean;
     canPerformance?: boolean;
     slackMemberId?: string;
+    workName?: string;
   };
   if (!body.uid) {
     return NextResponse.json({ error: "uid가 필요합니다." }, { status: 400 });
@@ -51,6 +52,7 @@ export async function PATCH(request: Request) {
       canDashboard: body.canDashboard,
       canPerformance: body.canPerformance,
       slackMemberId: body.slackMemberId,
+      workName: body.workName,
     });
     return NextResponse.json({ profile });
   } catch (error) {

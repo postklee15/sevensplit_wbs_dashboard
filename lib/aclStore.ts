@@ -102,10 +102,23 @@ export async function listProfiles(token: string): Promise<AccessProfile[]> {
     });
 }
 
+function normalizeWorkName(value: string): string {
+  const next = value.trim().slice(0, 79);
+  if (next && isUnassignedRow(next)) {
+    throw new Error("미지정 행 이름은 업무 이름으로 쓸 수 없습니다.");
+  }
+  return next;
+}
+
 export async function updateAccess(
   token: string,
   uid: string,
-  patch: { canDashboard?: boolean; canPerformance?: boolean; slackMemberId?: string },
+  patch: {
+    canDashboard?: boolean;
+    canPerformance?: boolean;
+    slackMemberId?: string;
+    workName?: string;
+  },
 ): Promise<AccessProfile> {
   const existing = await getDocument(token, COLLECTION, uid);
   if (!existing) {
@@ -116,18 +129,32 @@ export async function updateAccess(
     patch.slackMemberId !== undefined
       ? await resolveSlackMemberId(patch.slackMemberId)
       : current.slackMemberId;
+  const workName =
+    patch.workName !== undefined ? normalizeWorkName(patch.workName) : current.workName;
   if (current.isSuperAdmin) {
-    if (patch.slackMemberId === undefined) return current;
-    await patchDocument(token, COLLECTION, uid, { slackMemberId }, ["slackMemberId"]);
-    return { ...current, slackMemberId };
+    const fields: { slackMemberId?: string; workName?: string } = {};
+    const mask: string[] = [];
+    if (patch.slackMemberId !== undefined) {
+      fields.slackMemberId = slackMemberId;
+      mask.push("slackMemberId");
+    }
+    if (patch.workName !== undefined) {
+      fields.workName = workName;
+      mask.push("workName");
+    }
+    if (mask.length === 0) return current;
+    await patchDocument(token, COLLECTION, uid, fields, mask);
+    return { ...current, ...fields };
   }
   const next = {
     canDashboard: patch.canDashboard ?? current.canDashboard,
     canPerformance: patch.canPerformance ?? current.canPerformance,
     slackMemberId,
+    workName,
   };
   const mask = ["canDashboard", "canPerformance"];
   if (patch.slackMemberId !== undefined) mask.push("slackMemberId");
+  if (patch.workName !== undefined) mask.push("workName");
   await patchDocument(token, COLLECTION, uid, next, mask);
   return { ...current, ...next };
 }
@@ -142,10 +169,7 @@ export async function updateWorkName(
     throw new Error("프로필이 없습니다. 한 번 로그아웃 후 다시 로그인해 주세요.");
   }
   const current = toProfile(uid, existing.fields, "");
-  const next = workName.trim().slice(0, 79);
-  if (isUnassignedRow(next)) {
-    throw new Error("미지정 행 이름은 업무 이름으로 쓸 수 없습니다.");
-  }
+  const next = normalizeWorkName(workName);
   await patchDocument(token, COLLECTION, uid, { workName: next }, ["workName"]);
   return { ...current, workName: next };
 }
