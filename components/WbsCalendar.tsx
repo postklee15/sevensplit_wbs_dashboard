@@ -38,8 +38,9 @@ function eventClass(task: Task, today: string): string {
   return `cal-event ${taskStatus(task, today)}`;
 }
 
-function eventLabel(task: Task): string {
+function eventLabel(task: Task, omitAssignee = false): string {
   const project = task.service?.trim() || "—";
+  if (omitAssignee) return `${compactTaskLabel(task)} / ${project}`;
   const who = task.assignees.length > 0 ? task.assignees.join(", ") : UNASSIGNED;
   return `${compactTaskLabel(task)} / ${project} / ${who}`;
 }
@@ -50,12 +51,14 @@ export function WbsCalendar({
   mode,
   person,
   onSelectPerson,
+  lockPerson = false,
 }: {
   tasks: Task[];
   today: string;
   mode: "month" | "week";
   person: string | null;
-  onSelectPerson: (name: string | null) => void;
+  onSelectPerson?: (name: string | null) => void;
+  lockPerson?: boolean;
 }) {
   const todayDate = parseYmd(today);
   const [cursor, setCursor] = useState({
@@ -140,8 +143,10 @@ export function WbsCalendar({
         </div>
       </div>
       <p className="hint">
-        일정이 있는 WBS만 달력에 표시합니다. 막대를 누르면 노션 작업으로 이동합니다.
-        {person ? ` 현재 담당자 필터: ${person}.` : ""}
+        {lockPerson
+          ? "내 담당 작업만 표시합니다. 일정이 있는 작업만 달력에 나옵니다. 막대를 누르면 업무 상세를 봅니다."
+          : "일정이 있는 WBS만 달력에 표시합니다. 막대를 누르면 업무 상세를 봅니다."}
+        {!lockPerson && person ? ` 현재 담당자 필터: ${person}.` : ""}
       </p>
 
       {mode === "month" ? (
@@ -152,6 +157,7 @@ export function WbsCalendar({
           today={today}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          omitAssignee={lockPerson}
         />
       ) : (
         <WeekGrid
@@ -160,6 +166,7 @@ export function WbsCalendar({
           today={today}
           selectedDay={selectedDay}
           onSelectDay={setSelectedDay}
+          omitAssignee={lockPerson}
         />
       )}
 
@@ -174,11 +181,17 @@ export function WbsCalendar({
             tasks={selectedTasks}
             today={today}
             onSelectPerson={onSelectPerson}
+            lockPerson={lockPerson}
           />
         </div>
         <div className="panel">
           <h2>일정 없는 작업 · {missing.length}건</h2>
-          <DayTaskList tasks={missing} today={today} onSelectPerson={onSelectPerson} />
+          <DayTaskList
+            tasks={missing}
+            today={today}
+            onSelectPerson={onSelectPerson}
+            lockPerson={lockPerson}
+          />
         </div>
       </div>
     </section>
@@ -192,6 +205,7 @@ function MonthGrid({
   today,
   selectedDay,
   onSelectDay,
+  omitAssignee = false,
 }: {
   weeks: string[][];
   month: number;
@@ -199,6 +213,7 @@ function MonthGrid({
   today: string;
   selectedDay: string | null;
   onSelectDay: (ymd: string) => void;
+  omitAssignee?: boolean;
 }) {
   const { open } = useTaskDetail();
   return (
@@ -246,14 +261,14 @@ function MonthGrid({
                   key={`${item.task.id}-${item.startCol}`}
                   type="button"
                   className={eventClass(item.task, today)}
-                  title={eventLabel(item.task)}
+                  title={eventLabel(item.task, omitAssignee)}
                   onClick={() => open(item.task)}
                   style={{
                     gridColumn: `${item.startCol + 1} / span ${item.span}`,
                     gridRow: item.lane + 1,
                   }}
                 >
-                  {eventLabel(item.task)}
+                  {eventLabel(item.task, omitAssignee)}
                 </button>
               ))}
             </div>
@@ -270,12 +285,14 @@ function WeekGrid({
   today,
   selectedDay,
   onSelectDay,
+  omitAssignee = false,
 }: {
   weekStart: string;
   tasks: Task[];
   today: string;
   selectedDay: string | null;
   onSelectDay: (ymd: string) => void;
+  omitAssignee?: boolean;
 }) {
   const { open } = useTaskDetail();
   const days = Array.from({ length: 7 }, (_, i) =>
@@ -316,14 +333,14 @@ function WeekGrid({
             key={`${item.task.id}-${item.startCol}`}
             type="button"
             className={eventClass(item.task, today)}
-            title={eventLabel(item.task)}
+            title={eventLabel(item.task, omitAssignee)}
             onClick={() => open(item.task)}
             style={{
               gridColumn: `${item.startCol + 1} / span ${item.span}`,
               gridRow: item.lane + 1,
             }}
           >
-            {eventLabel(item.task)}
+            {eventLabel(item.task, omitAssignee)}
           </button>
         ))}
       </div>
@@ -338,14 +355,18 @@ function DayTaskList({
   tasks,
   today,
   onSelectPerson,
+  lockPerson = false,
 }: {
   tasks: Task[];
   today: string;
-  onSelectPerson: (name: string | null) => void;
+  onSelectPerson?: (name: string | null) => void;
+  lockPerson?: boolean;
 }) {
   if (tasks.length === 0) {
     return <p className="empty">표시할 작업이 없습니다.</p>;
   }
+
+  const personLocked = lockPerson || !onSelectPerson;
 
   return (
     <ul className="cal-tasklist">
@@ -358,13 +379,19 @@ function DayTaskList({
             <div>
               <TaskTitle task={task} showIssue={false} />
               <div className="issue">
-                <button
-                  type="button"
-                  className="inline-person"
-                  onClick={() => onSelectPerson(task.assignees[0] ?? unassignedRowName(task.service))}
-                >
-                  {who}
-                </button>
+                {personLocked ? (
+                  <span>{who}</span>
+                ) : (
+                  <button
+                    type="button"
+                    className="inline-person"
+                    onClick={() =>
+                      onSelectPerson(task.assignees[0] ?? unassignedRowName(task.service))
+                    }
+                  >
+                    {who}
+                  </button>
+                )}
                 {task.service ? ` · ${task.service}` : ""}
                 {task.effortDays == null && !task.start
                   ? " · 일정·소요일 미정"

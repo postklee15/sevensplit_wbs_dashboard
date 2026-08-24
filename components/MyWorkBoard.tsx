@@ -15,6 +15,9 @@ import {
 } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
+import { WbsCalendar } from "@/components/WbsCalendar";
+
+type MyView = "list" | "month" | "week";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -174,6 +177,7 @@ export function MyWorkBoard({
   const [hideDone, setHideDone] = useState(true);
   const [service, setService] = useState<string | null>(null);
   const [query, setQuery] = useState("");
+  const [view, setView] = useState<MyView>("list");
 
   const load = useCallback(async () => {
     if (!workName) return;
@@ -249,12 +253,35 @@ export function MyWorkBoard({
           <p className="kicker">Split Invest · {payload?.databaseTitle ?? "WBS"}</p>
           <h1>내 업무 · {workName}</h1>
           <p className="sub">
-            노션 담당자가 {workName}인 작업만 표시합니다.
+            노션 담당자가 {workName}인 작업만 표시합니다. 목록·월력·주력으로 볼 수 있습니다.
             {fetched ? ` · ${fetched} 동기화` : ""}{" "}
             <Link href="/profile">이름 바꾸기</Link>
           </p>
         </div>
         <div className="controls">
+          <div className="view-switch" role="tablist" aria-label="보기">
+            <button
+              className={`chip ${view === "list" ? "on" : ""}`}
+              type="button"
+              onClick={() => setView("list")}
+            >
+              목록
+            </button>
+            <button
+              className={`chip ${view === "month" ? "on" : ""}`}
+              type="button"
+              onClick={() => setView("month")}
+            >
+              월력
+            </button>
+            <button
+              className={`chip ${view === "week" ? "on" : ""}`}
+              type="button"
+              onClick={() => setView("week")}
+            >
+              주력
+            </button>
+          </div>
           <input
             placeholder="상위 작업, 작업명, 속성, 이슈 검색"
             value={query}
@@ -321,17 +348,17 @@ export function MyWorkBoard({
         </article>
       </section>
 
-      <section className="panel tasks-panel">
-        <h2>작업 · {mine.length}건</h2>
-        <div className="table-wrap">
-          {loading && !payload ? (
-            <p className="empty">노션에서 작업을 불러오는 중입니다.</p>
-          ) : mine.length === 0 ? (
-            <p className="empty">
-              이 이름으로 연결된 작업이 없습니다. 노션 담당자 철자가{" "}
-              <Link href="/profile">프로필</Link>과 같은지 확인해 주세요.
-            </p>
-          ) : (
+      {loading && !payload ? (
+        <p className="empty">노션에서 작업을 불러오는 중입니다.</p>
+      ) : mine.length === 0 ? (
+        <p className="empty">
+          이 이름으로 연결된 작업이 없습니다. 노션 담당자 철자가{" "}
+          <Link href="/profile">프로필</Link>과 같은지 확인해 주세요.
+        </p>
+      ) : view === "list" ? (
+        <section className="panel tasks-panel">
+          <h2>작업 · {mine.length}건</h2>
+          <div className="table-wrap">
             <table className="tasks">
               <thead>
                 <tr>
@@ -374,9 +401,17 @@ export function MyWorkBoard({
                 })}
               </tbody>
             </table>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      ) : (
+        <WbsCalendar
+          tasks={mine}
+          today={today}
+          mode={view}
+          person={workName}
+          lockPerson
+        />
+      )}
     </main>
   );
 }
