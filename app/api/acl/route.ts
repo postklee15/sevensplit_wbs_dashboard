@@ -42,9 +42,13 @@ export async function PATCH(request: Request) {
     canPerformance?: boolean;
     slackMemberId?: string;
     workName?: string;
+    role?: "lead" | "member";
   };
   if (!body.uid) {
     return NextResponse.json({ error: "uid가 필요합니다." }, { status: 400 });
+  }
+  if (body.role && body.role !== "lead" && body.role !== "member") {
+    return NextResponse.json({ error: "역할은 팀장 또는 팀원만 지정할 수 있습니다." }, { status: 400 });
   }
 
   try {
@@ -53,6 +57,7 @@ export async function PATCH(request: Request) {
       canPerformance: body.canPerformance,
       slackMemberId: body.slackMemberId,
       workName: body.workName,
+      role: body.role,
     });
     return NextResponse.json({ profile });
   } catch (error) {

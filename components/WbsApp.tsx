@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useState } from "react";
 import type { User } from "firebase/auth";
 import { Dashboard } from "@/components/Dashboard";
+import type { AccessProfile } from "@/lib/acl";
 import type { DashboardPayload } from "@/lib/types";
 import { writeSessionCookie } from "@/lib/sessionCookie";
 
-export function WbsApp({ user }: { user: User }) {
+export function WbsApp({ user, profile }: { user: User; profile: AccessProfile }) {
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -67,6 +68,7 @@ export function WbsApp({ user }: { user: User }) {
   return (
     <Dashboard
       payload={payload}
+      profile={profile}
       onRefresh={() => void load()}
       refreshing={loading}
     />

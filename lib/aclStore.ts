@@ -2,7 +2,9 @@ import {
   applySuperAdmin,
   isSuperAdminEmail,
   normalizeEmail,
+  parseRole,
   type AccessProfile,
+  type OrgRole,
 } from "./acl";
 import { boolField, getDocument, listDocuments, patchDocument, strField } from "./firestoreRest";
 import { isUnassignedRow } from "./metrics";
@@ -16,6 +18,7 @@ function toProfile(
   emailFallback: string,
 ): AccessProfile {
   const email = normalizeEmail(strField(fields, "email") || emailFallback);
+  const superAdmin = isSuperAdminEmail(email);
   return applySuperAdmin({
     uid,
     email,
@@ -24,7 +27,8 @@ function toProfile(
     canDashboard: boolField(fields, "canDashboard", true),
     canPerformance: boolField(fields, "canPerformance", false),
     slackMemberId: strField(fields, "slackMemberId").trim(),
-    isSuperAdmin: isSuperAdminEmail(email),
+    role: parseRole(strField(fields, "role"), superAdmin),
+    isSuperAdmin: superAdmin,
     createdAt: strField(fields, "createdAt") || null,
     lastSeenAt: strField(fields, "lastSeenAt") || null,
   });
@@ -52,6 +56,7 @@ export async function heartbeatUser(opts: {
         canDashboard: true,
         canPerformance: superAdmin,
         slackMemberId: "",
+        role: "member",
         createdAt: now,
         lastSeenAt: now,
       },
@@ -62,6 +67,7 @@ export async function heartbeatUser(opts: {
         "canDashboard",
         "canPerformance",
         "slackMemberId",
+        "role",
         "createdAt",
         "lastSeenAt",
       ],
@@ -74,6 +80,7 @@ export async function heartbeatUser(opts: {
       canDashboard: true,
       canPerformance: superAdmin,
       slackMemberId: "",
+      role: parseRole("member", superAdmin),
       isSuperAdmin: superAdmin,
       createdAt: now,
       lastSeenAt: now,
@@ -97,7 +104,10 @@ export async function listProfiles(token: string): Promise<AccessProfile[]> {
     .map((doc) => toProfile(doc.id, doc.fields, ""))
     .filter((profile) => Boolean(profile.email))
     .sort((a, b) => {
-      if (a.isSuperAdmin !== b.isSuperAdmin) return a.isSuperAdmin ? -1 : 1;
+      const rank = (role: AccessProfile["role"]) =>
+        role === "superAdmin" ? 0 : role === "lead" ? 1 : 2;
+      const delta = rank(a.role) - rank(b.role);
+      if (delta !== 0) return delta;
       return a.email.localeCompare(b.email);
     });
 }
@@ -118,6 +128,7 @@ export async function updateAccess(
     canPerformance?: boolean;
     slackMemberId?: string;
     workName?: string;
+    role?: OrgRole;
   },
 ): Promise<AccessProfile> {
   const existing = await getDocument(token, COLLECTION, uid);
@@ -146,13 +157,16 @@ export async function updateAccess(
     await patchDocument(token, COLLECTION, uid, fields, mask);
     return { ...current, ...fields };
   }
+  const role: OrgRole =
+    patch.role === "lead" || patch.role === "member" ? patch.role : current.role === "lead" ? "lead" : "member";
   const next = {
-    canDashboard: patch.canDashboard ?? current.canDashboard,
+    canDashboard: role === "lead" ? true : (patch.canDashboard ?? current.canDashboard),
     canPerformance: patch.canPerformance ?? current.canPerformance,
     slackMemberId,
     workName,
+    role,
   };
-  const mask = ["canDashboard", "canPerformance"];
+  const mask = ["canDashboard", "canPerformance", "role"];
   if (patch.slackMemberId !== undefined) mask.push("slackMemberId");
   if (patch.workName !== undefined) mask.push("workName");
   await patchDocument(token, COLLECTION, uid, next, mask);

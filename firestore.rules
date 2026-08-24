@@ -13,6 +13,7 @@ rules_version = '2';
 //   canDashboard (bool, required)
 //   canPerformance (bool, required)
 //   slackMemberId (string, optional) — Slack U… ID. 하트비트가 덮지 않음
+//   role (string, optional) — lead | member. 슈퍼관리자는 이메일로 고정. 없으면 팀원
 //   createdAt (string ISO, required on create)
 //   lastSeenAt (string ISO, required)
 // Collection: projectPms — 서비스 → PM uid (슈퍼관리자만)
@@ -61,7 +62,9 @@ service cloud.firestore {
         && (!('workName' in data)
           || (data.workName is string && data.workName.size() < 80))
         && (!('slackMemberId' in data)
-          || (data.slackMemberId is string && data.slackMemberId.size() < 32));
+          || (data.slackMemberId is string && data.slackMemberId.size() < 32))
+        && (!('role' in data)
+          || (data.role is string && data.role in ['lead', 'member', 'superAdmin']));
     }
 
     match /users/{uid} {
@@ -73,7 +76,8 @@ service cloud.firestore {
         && request.resource.data.canDashboard == true
         && request.resource.data.canPerformance == (
           request.auth.token.email.lower() == 'shlim@sevensplit.com'
-        );
+        )
+        && request.resource.data.get('role', 'member') == 'member';
       allow update: if isValidUser(request.resource.data)
         && (
           (
@@ -83,6 +87,7 @@ service cloud.firestore {
             && request.resource.data.canPerformance == resource.data.canPerformance
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.get('slackMemberId', '') == resource.data.get('slackMemberId', '')
+            && request.resource.data.get('role', '') == resource.data.get('role', '')
           )
           || (
             isSuperAdmin()

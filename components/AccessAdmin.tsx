@@ -1,7 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { AccessProfile } from "@/lib/acl";
+import type { AccessProfile, OrgRole } from "@/lib/acl";
+import { ROLE_LABEL } from "@/lib/acl";
 import type { ProjectPm } from "@/lib/alertStore";
 
 type PreviewRow = {
@@ -83,7 +84,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
 
   async function applyPatch(
     user: AccessProfile,
-    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName">>,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName" | "role">>,
   ) {
     const res = await fetch("/api/acl", {
       method: "PATCH",
@@ -97,7 +98,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
 
   async function save(
     user: AccessProfile,
-    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName">>,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName" | "role">>,
   ) {
     setBusy(user.uid);
     setError(null);
@@ -184,9 +185,9 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
           <p className="kicker">Split Invest · 접근 권한</p>
           <h1>사용자 권한</h1>
           <p className="sub">
-            {me.email} 슈퍼 관리자. 업무 이름은 노션 담당자와 같게 직접 넣을 수 있습니다. Slack 칸에 이메일을 넣거나
-            「이메일로 찾기」를 누르면 멤버 ID를 채웁니다. 칸을 비워 두면 보낼 때 로그인 이메일로 찾습니다. 서비스 PM은
-            미지정 작업 DM을 받습니다.
+            {me.email} 슈퍼관리자만 이 화면을 엽니다. 역할은 슈퍼관리자 · 팀장 · 팀원입니다. 팀장은 부하에서 전 인원을
+            보고, 팀원(구성원)은 본인 부하만 봅니다. 업무 이름은 노션 담당자와 같게 넣으세요. Slack 칸에 이메일을 넣거나
+            「이메일로 찾기」로 멤버 ID를 채웁니다.
           </p>
         </div>
         <div className="controls">
@@ -235,7 +236,21 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       }}
                     />
                   </td>
-                  <td>{user.isSuperAdmin ? "슈퍼 관리자" : "구성원"}</td>
+                  <td>
+                    {user.isSuperAdmin ? (
+                      ROLE_LABEL.superAdmin
+                    ) : (
+                      <select
+                        className="cell-input"
+                        value={user.role === "lead" ? "lead" : "member"}
+                        disabled={busy === user.uid}
+                        onChange={(e) => void save(user, { role: e.target.value as OrgRole })}
+                      >
+                        <option value="lead">{ROLE_LABEL.lead}</option>
+                        <option value="member">{ROLE_LABEL.member}</option>
+                      </select>
+                    )}
+                  </td>
                   <td>
                     <div className="slack-id-cell">
                       <input
@@ -265,7 +280,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       <input
                         type="checkbox"
                         checked={user.canDashboard}
-                        disabled={user.isSuperAdmin || busy === user.uid}
+                        disabled={user.isSuperAdmin || user.role === "lead" || busy === user.uid}
                         onChange={(e) => void save(user, { canDashboard: e.target.checked })}
                       />
                       허용

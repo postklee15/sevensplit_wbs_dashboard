@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Pager, PageSizeSelect } from "@/components/Pager";
 import { pageSlice } from "@/lib/pager";
+import type { AccessProfile } from "@/lib/acl";
+import { canViewAllLoad } from "@/lib/acl";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { TaskTitle } from "@/components/TaskTitle";
@@ -65,15 +67,19 @@ function dateRange(task: Task): string {
 
 export function Dashboard({
   payload,
+  profile,
   onRefresh,
   refreshing = false,
 }: {
   payload: DashboardPayload;
+  profile: AccessProfile;
   onRefresh?: () => void;
   refreshing?: boolean;
 }) {
   const today = todayKst();
   const weeks = useMemo(() => weekStarts(today), [today]);
+  const viewAll = canViewAllLoad(profile);
+  const ownName = profile.workName.trim();
   const [leafOnly, setLeafOnly] = useState(true);
   const [hideDone, setHideDone] = useState(true);
   const [service, setService] = useState<string | null>(null);
@@ -87,20 +93,32 @@ export function Dashboard({
   const [unassignedPage, setUnassignedPage] = useState(1);
   const [assignedPage, setAssignedPage] = useState(1);
 
-  const scoped = useMemo(
-    () =>
-      filterTasks(payload.tasks, {
-        leafOnly,
-        service,
-        person: null,
-        hideDone: false,
-        query: "",
-        today,
-      }),
-    [payload.tasks, leafOnly, service, today],
-  );
+  useEffect(() => {
+    if (!viewAll) setPerson(ownName || null);
+  }, [viewAll, ownName]);
 
-  const rows = useMemo(() => buildPersonRows(scoped, today, weeks), [scoped, today, weeks]);
+  function pickPerson(name: string | null) {
+    if (!viewAll) return;
+    setPerson(name);
+  }
+
+  const scoped = useMemo(() => {
+    if (!viewAll && !ownName) return [];
+    return filterTasks(payload.tasks, {
+      leafOnly,
+      service,
+      person: viewAll ? null : ownName,
+      hideDone: false,
+      query: "",
+      today,
+    });
+  }, [payload.tasks, leafOnly, service, today, viewAll, ownName]);
+
+  const rows = useMemo(() => {
+    const built = buildPersonRows(scoped, today, weeks);
+    if (viewAll) return built;
+    return built.filter((row) => row.name === ownName);
+  }, [scoped, today, weeks, viewAll, ownName]);
   const totals = useMemo(() => summary(rows), [rows]);
   const services = useMemo(() => servicesOf(payload.tasks), [payload.tasks]);
 
@@ -184,9 +202,13 @@ export function Dashboard({
       <header className="top">
         <div>
           <p className="kicker">Split Invest · {payload.databaseTitle}</p>
-          <h1>담당자별 리소스 현황</h1>
+          <h1>{viewAll ? "담당자별 리소스 현황" : `내 부하 · ${ownName || "이름 없음"}`}</h1>
       <p className="sub">
-            하위 작업 공수 기준 · 주 용량 {WEEKLY_CAPACITY}인일 · {today} 기준 · {fetched} 동기화
+            {viewAll
+              ? `하위 작업 공수 기준 · 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
+              : ownName
+                ? `팀원은 본인 담당 작업만 봅니다. 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
+                : "프로필에 노션 담당자 이름을 저장해야 내 부하를 표시합니다."}
           </p>
         </div>
         <div className="controls">
@@ -261,8 +283,8 @@ export function Dashboard({
             {name}
           </button>
         ))}
-        {person ? (
-          <button className="chip on" type="button" onClick={() => setPerson(null)}>
+        {person && viewAll ? (
+          <button className="chip on" type="button" onClick={() => pickPerson(null)}>
             담당자 {isUnassignedRow(person) ? unassignedDisplayName(person) : person} ×
           </button>
         ) : null}
@@ -291,7 +313,7 @@ export function Dashboard({
         </article>
       </section>
 
-      {totals.unassignedOpen > 0 && view === "load" ? (
+      {totals.unassignedOpen > 0 && view === "load" && viewAll ? (
         <p className="hint" style={{ marginTop: -12, marginBottom: 20 }}>
           담당자가 없는 미완료 작업 {totals.unassignedOpen}건이 있습니다. 히트맵의 미지정 행을 누르면
           서비스별로 목록을 볼 수 있습니다.
@@ -304,7 +326,8 @@ export function Dashboard({
           today={today}
           mode={view}
           person={person}
-          onSelectPerson={(name) => setPerson(person === name ? null : name)}
+          onSelectPerson={viewAll ? (name) => pickPerson(person === name ? null : name) : undefined}
+          lockPerson={!viewAll}
         />
       ) : null}
 
@@ -406,7 +429,7 @@ export function Dashboard({
                 className={`${person === row.name ? "selected" : ""} ${isUnassignedRow(row.name) ? "unassigned" : ""}`.trim()}
               >
                 <td className="name">
-                  <button type="button" onClick={() => setPerson(person === row.name ? null : row.name)}>
+                  <button type="button" onClick={() => pickPerson(person === row.name ? null : row.name)}>
                     {heatNameLabel(row.name)}
                   </button>
                 </td>
@@ -457,9 +480,9 @@ export function Dashboard({
               <PageSizeSelect value={pageSize} onChange={setPageSize} />
             ) : null}
           </div>
-          {person ? (
+          {person && viewAll ? (
             <p className="hint" style={{ padding: "8px 16px 0" }}>
-              <button className="chip" type="button" onClick={() => setPerson(null)}>
+              <button className="chip" type="button" onClick={() => pickPerson(null)}>
                 담당자 필터 해제
               </button>
             </p>
@@ -539,7 +562,7 @@ export function Dashboard({
                   key={row.name}
                   type="button"
                   className={`person ${person === row.name ? "on" : ""}`}
-                  onClick={() => setPerson(person === row.name ? null : row.name)}
+                  onClick={() => pickPerson(person === row.name ? null : row.name)}
                 >
                   <div>
                     <b>{row.name}</b>

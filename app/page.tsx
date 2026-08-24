@@ -11,7 +11,7 @@ export default function HomePage() {
         <ProfileGate user={user}>
           {({ user: signed, profile }) =>
             profile.canDashboard ? (
-              <WbsApp user={signed} />
+              <WbsApp user={signed} profile={profile} />
             ) : (
               <main className="auth-page">
                 <p className="kicker">Sevensplit WBS</p>

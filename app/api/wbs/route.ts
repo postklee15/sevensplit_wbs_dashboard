@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
-import { canOpenPage } from "@/lib/acl";
+import { canOpenPage, canViewAllLoad } from "@/lib/acl";
 import { jsonAuthError, requireSevensplitUser } from "@/lib/adminAuth";
 import { heartbeatUser } from "@/lib/aclStore";
+import { filterTasks } from "@/lib/metrics";
 import { fetchWbsTasks } from "@/lib/notion";
 
 export const runtime = "nodejs";
@@ -26,7 +27,19 @@ export async function GET(request: Request) {
         { status: 403 },
       );
     }
-    const { databaseTitle, tasks } = await fetchWbsTasks();
+    const { databaseTitle, tasks: allTasks } = await fetchWbsTasks();
+    const ownName = profile.workName.trim();
+    const tasks = canViewAllLoad(profile)
+      ? allTasks
+      : ownName
+        ? filterTasks(allTasks, {
+            leafOnly: false,
+            service: null,
+            person: ownName,
+            hideDone: false,
+            query: "",
+          })
+        : [];
     return NextResponse.json({
       fetchedAt: new Date().toISOString(),
       databaseTitle,

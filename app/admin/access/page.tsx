@@ -15,8 +15,8 @@ export default function AccessPage() {
             ) : (
               <main className="auth-page">
                 <p className="kicker">Split Invest · 권한</p>
-                <h1>슈퍼 관리자만 볼 수 있습니다</h1>
-                <p className="sub">권한 관리는 shlim@sevensplit.com 계정으로만 열 수 있습니다.</p>
+                <h1>슈퍼관리자만 볼 수 있습니다</h1>
+                <p className="sub">권한 페이지는 슈퍼관리자만 엽니다. 팀장·팀원은 부하·내 업무만 사용합니다.</p>
               </main>
             )
           }
