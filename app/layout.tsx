@@ -1,5 +1,6 @@
 import { IBM_Plex_Sans_KR } from "next/font/google";
 import type { ReactNode } from "react";
+import { TaskDetailProvider } from "@/components/TaskDetail";
 import "./globals.css";
 
 const plex = IBM_Plex_Sans_KR({
@@ -16,7 +17,9 @@ export const metadata = {
 export default function RootLayout({ children }: { children: ReactNode }) {
   return (
     <html lang="ko">
-      <body className={plex.className}>{children}</body>
+      <body className={plex.className}>
+        <TaskDetailProvider>{children}</TaskDetailProvider>
+      </body>
     </html>
   );
 }

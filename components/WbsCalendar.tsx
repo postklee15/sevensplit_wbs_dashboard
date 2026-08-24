@@ -25,6 +25,7 @@ import {
   weekLabel,
 } from "@/lib/calendar";
 import { TaskTitle, compactTaskLabel } from "@/components/TaskTitle";
+import { useTaskDetail } from "@/components/TaskDetail";
 
 const MONTH_LANES = 3;
 const WEEK_LANES = 10;
@@ -199,6 +200,7 @@ function MonthGrid({
   selectedDay: string | null;
   onSelectDay: (ymd: string) => void;
 }) {
+  const { open } = useTaskDetail();
   return (
     <div className="cal-board">
       <div className="cal-weekdays">
@@ -240,20 +242,19 @@ function MonthGrid({
               style={{ gridTemplateRows: `repeat(${laneCount}, 22px)` }}
             >
               {visible.map((item) => (
-                <a
+                <button
                   key={`${item.task.id}-${item.startCol}`}
+                  type="button"
                   className={eventClass(item.task, today)}
-                  href={item.task.url}
-                  target="_blank"
-                  rel="noreferrer"
                   title={eventLabel(item.task)}
+                  onClick={() => open(item.task)}
                   style={{
                     gridColumn: `${item.startCol + 1} / span ${item.span}`,
                     gridRow: item.lane + 1,
                   }}
                 >
                   {eventLabel(item.task)}
-                </a>
+                </button>
               ))}
             </div>
           </div>
@@ -276,6 +277,7 @@ function WeekGrid({
   selectedDay: string | null;
   onSelectDay: (ymd: string) => void;
 }) {
+  const { open } = useTaskDetail();
   const days = Array.from({ length: 7 }, (_, i) =>
     formatYmd(addDays(parseYmd(weekStart), i)),
   );
@@ -310,20 +312,19 @@ function WeekGrid({
         style={{ gridTemplateRows: `repeat(${laneCount}, 36px)` }}
       >
         {visible.map((item) => (
-          <a
+          <button
             key={`${item.task.id}-${item.startCol}`}
+            type="button"
             className={eventClass(item.task, today)}
-            href={item.task.url}
-            target="_blank"
-            rel="noreferrer"
             title={eventLabel(item.task)}
+            onClick={() => open(item.task)}
             style={{
               gridColumn: `${item.startCol + 1} / span ${item.span}`,
               gridRow: item.lane + 1,
             }}
           >
             {eventLabel(item.task)}
-          </a>
+          </button>
         ))}
       </div>
       {layout.length === 0 ? (

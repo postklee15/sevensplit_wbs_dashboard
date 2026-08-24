@@ -1,22 +1,26 @@
+"use client";
+
 import type { Task } from "@/lib/types";
+import { useTaskDetail, type TaskView } from "@/components/TaskDetail";
 
 export function TaskTitle({
   task,
   showIssue = true,
   issueMax = 120,
 }: {
-  task: Pick<Task, "title" | "url" | "ancestorTitles" | "issue">;
+  task: TaskView;
   showIssue?: boolean;
   issueMax?: number;
 }) {
+  const { open } = useTaskDetail();
   const path = (task.ancestorTitles ?? []).filter(Boolean);
   const issue = (task.issue ?? "").trim();
   return (
     <>
       {path.length > 0 ? <div className="title-path">{path.join(" / ")}</div> : null}
-      <a className="title-link" href={task.url} target="_blank" rel="noreferrer">
+      <button className="title-link" type="button" onClick={() => open(task)}>
         {task.title}
-      </a>
+      </button>
       {showIssue && issue ? <div className="issue">{issue.slice(0, issueMax)}</div> : null}
     </>
   );
