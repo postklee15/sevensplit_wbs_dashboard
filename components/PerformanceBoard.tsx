@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AccessProfile } from "@/lib/acl";
 import { TaskTitle } from "@/components/TaskTitle";
+import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -76,6 +77,8 @@ export function PerformanceBoard({ token }: { token: string; profile: AccessProf
   useEffect(() => {
     void load();
   }, [load]);
+
+  useWbsDataRefresh(load);
 
   const services = useMemo(() => {
     if (!payload) return [];

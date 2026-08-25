@@ -20,6 +20,7 @@ import {
 import { TaskTitle } from "@/components/TaskTitle";
 import { Pager, PageSizeSelect } from "@/components/Pager";
 import { pageSlice } from "@/lib/pager";
+import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 function fmt(n: number, digits = 1): string {
   return n.toLocaleString("ko-KR", {
@@ -75,6 +76,8 @@ export function ApprovalBoard({ token }: { token: string }) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useWbsDataRefresh(load);
 
   const scoped = useMemo(() => {
     if (!payload) return [];

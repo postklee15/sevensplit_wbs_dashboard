@@ -17,6 +17,7 @@ import {
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
 import { WbsCalendar } from "@/components/WbsCalendar";
+import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 type MyView = "list" | "month" | "week";
 
@@ -203,6 +204,8 @@ export function MyWorkBoard({
   useEffect(() => {
     void load();
   }, [load]);
+
+  useWbsDataRefresh(load);
 
   const mine = useMemo(() => {
     if (!payload || !workName) return [];

@@ -5,6 +5,7 @@ import type { User } from "firebase/auth";
 import type { AccessProfile } from "@/lib/acl";
 import { writeSessionCookie } from "@/lib/sessionCookie";
 import { SiteNav } from "@/components/SiteNav";
+import { TaskDetailProvider } from "@/components/TaskDetail";
 
 export function ProfileGate({
   user,
@@ -75,9 +76,9 @@ export function ProfileGate({
   }
 
   return (
-    <>
+    <TaskDetailProvider profile={profile} token={token}>
       <SiteNav profile={profile} user={user} />
       {children({ user, profile, token, setProfile })}
-    </>
+    </TaskDetailProvider>
   );
 }

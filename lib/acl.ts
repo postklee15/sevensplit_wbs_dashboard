@@ -58,3 +58,22 @@ export function canViewAllLoad(profile: AccessProfile): boolean {
   const role = applySuperAdmin(profile).role;
   return role === "superAdmin" || role === "lead";
 }
+
+/** 슈퍼관리자·팀장은 모든 작업. 팀원은 workName이 담당자와 완전 일치할 때만. */
+export function canEditWbsTask(profile: AccessProfile, assignees: string[]): boolean {
+  const resolved = applySuperAdmin(profile);
+  if (resolved.role === "superAdmin" || resolved.role === "lead") return true;
+  const workName = resolved.workName.trim();
+  if (!workName) return false;
+  return assignees.some((name) => name === workName);
+}
+
+/** 상세 조회. 팀장은 전체, 팀원은 본인 담당. 성과 권한이면 완료 목록 상세를 위해 허용. */
+export function canReadWbsTask(profile: AccessProfile, assignees: string[]): boolean {
+  const resolved = applySuperAdmin(profile);
+  if (!canOpenPage(resolved, "dashboard") && !canOpenPage(resolved, "performance")) {
+    return false;
+  }
+  if (canViewAllLoad(resolved) || canOpenPage(resolved, "performance")) return true;
+  return canEditWbsTask(resolved, assignees);
+}

@@ -1,10 +1,57 @@
-import type { Task } from "./types";
+import type { AssigneePerson, Task } from "./types";
 
 type NotionRichText = { plain_text?: string };
-type NotionPerson = { name?: string };
+type NotionPerson = { id?: string; name?: string };
 type NotionSelect = { name?: string } | null;
 type NotionDate = { start?: string | null; end?: string | null } | null;
 type NotionRelation = { id: string };
+
+export type NotionPage = {
+  id: string;
+  url?: string;
+  properties?: Record<string, NotionProperty>;
+  parent?: { type?: string; database_id?: string };
+};
+
+export function getNotionConfig(): {
+  token: string;
+  databaseId: string;
+  headers: {
+    Authorization: string;
+    "Notion-Version": string;
+    "Content-Type": string;
+  };
+} {
+  const token = process.env.NOTION_TOKEN;
+  const databaseId = process.env.NOTION_DATABASE_ID;
+  if (!token || !databaseId) {
+    throw new Error("NOTION_TOKEN 또는 NOTION_DATABASE_ID가 없습니다.");
+  }
+  return {
+    token,
+    databaseId,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Notion-Version": "2022-06-28",
+      "Content-Type": "application/json",
+    },
+  };
+}
+
+export function normalizeNotionId(id: string): string {
+  return id.replace(/-/g, "").toLowerCase();
+}
+
+export function isWbsDatabaseId(id: string | null | undefined): boolean {
+  if (!id) return false;
+  const databaseId = process.env.NOTION_DATABASE_ID;
+  if (!databaseId) return false;
+  return normalizeNotionId(id) === normalizeNotionId(databaseId);
+}
+
+export function isNotionPageId(id: string): boolean {
+  return /^[0-9a-f]{32}$/i.test(normalizeNotionId(id));
+}
 
 type NotionProperty = {
   type?: string;
@@ -19,12 +66,6 @@ type NotionProperty = {
   date?: NotionDate;
   url?: string | null;
   relation?: NotionRelation[];
-};
-
-type NotionPage = {
-  id: string;
-  url?: string;
-  properties?: Record<string, NotionProperty>;
 };
 
 function plain(parts: NotionRichText[] | undefined): string {
@@ -92,21 +133,40 @@ function pickProp(
 
 type ParsedTask = Task & { childIds: string[]; parentIds: string[] };
 
+function peopleOf(prop: NotionProperty | undefined): AssigneePerson[] {
+  const seen = new Set<string>();
+  const people: AssigneePerson[] = [];
+  for (const person of prop?.people ?? []) {
+    const id = person.id?.trim();
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    people.push({
+      id,
+      name: person.name?.trim() || "(이름 없음)",
+    });
+  }
+  return people;
+}
+
 export function parseTask(page: NotionPage): ParsedTask | null {
   const props = page.properties ?? {};
   const title = plain(props["작업명"]?.title);
   const childIds = (props["하위 항목"]?.relation ?? []).map((rel) => rel.id);
   const parentIds = (props["상위 항목"]?.relation ?? []).map((rel) => rel.id);
+  const assigneePeople = peopleOf(props["담당자"]);
+  const own = props["서비스"]?.select?.name?.trim() || null;
 
   return {
     id: page.id,
     title,
     url: page.url ?? "",
     ancestorTitles: [],
-    assignees: (props["담당자"]?.people ?? [])
-      .map((person) => person.name?.trim())
-      .filter((name): name is string => Boolean(name)),
-    service: props["서비스"]?.select?.name?.trim() || null,
+    assignees: assigneePeople
+      .map((person) => person.name.trim())
+      .filter((name) => name && name !== "(이름 없음)"),
+    assigneePeople,
+    ownService: own,
+    service: own,
     attribute: displayValue(pickProp(props, ["업무속성", "업무 속성"])),
     importance: displayValue(pickProp(props, ["중요도"])),
     progress: numberValue(props["진척도"]),
@@ -125,8 +185,8 @@ export function parseTask(page: NotionPage): ParsedTask | null {
   };
 }
 
-function ownService(task: { service: string | null } | undefined): string | null {
-  const name = task?.service?.trim();
+function ownService(task: { ownService?: string | null; service: string | null } | undefined): string | null {
+  const name = task?.ownService?.trim() || task?.service?.trim();
   return name || null;
 }
 
@@ -176,6 +236,7 @@ function withTreeFields(tasks: ParsedTask[]): Task[] {
   return tasks.map(({ childIds: _childIds, parentIds: _parentIds, ...task }) => ({
     ...task,
     ancestorTitles: ancestorTitlesOf(task.id),
+    ownService: ownService(task),
     service: inheritedServiceOf(task.id),
   }));
 }
@@ -183,18 +244,9 @@ function withTreeFields(tasks: ParsedTask[]): Task[] {
 export async function fetchWbsTasks(): Promise<{
   databaseTitle: string;
   tasks: Task[];
+  properties: Record<string, unknown>;
 }> {
-  const token = process.env.NOTION_TOKEN;
-  const databaseId = process.env.NOTION_DATABASE_ID;
-  if (!token || !databaseId) {
-    throw new Error("NOTION_TOKEN 또는 NOTION_DATABASE_ID가 없습니다.");
-  }
-
-  const headers = {
-    Authorization: `Bearer ${token}`,
-    "Notion-Version": "2022-06-28",
-    "Content-Type": "application/json",
-  };
+  const { databaseId, headers } = getNotionConfig();
 
   const dbRes = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
     headers,
@@ -206,6 +258,7 @@ export async function fetchWbsTasks(): Promise<{
   }
   const dbJson = (await dbRes.json()) as {
     title?: NotionRichText[];
+    properties?: Record<string, unknown>;
   };
   const databaseTitle = plain(dbJson.title) || "WBS & Gantt";
 
@@ -241,5 +294,99 @@ export async function fetchWbsTasks(): Promise<{
     .map(parseTask)
     .filter((task): task is ParsedTask => Boolean(task && task.title));
 
-  return { databaseTitle, tasks: withTreeFields(parsed) };
+  return {
+    databaseTitle,
+    tasks: withTreeFields(parsed),
+    properties: dbJson.properties ?? {},
+  };
+}
+
+export async function fetchWbsDatabase(): Promise<{
+  databaseTitle: string;
+  properties: Record<string, unknown>;
+}> {
+  const { databaseId, headers } = getNotionConfig();
+  const dbRes = await fetch(`https://api.notion.com/v1/databases/${databaseId}`, {
+    headers,
+    cache: "no-store",
+  });
+  if (!dbRes.ok) {
+    const body = await dbRes.text();
+    throw new Error(`노션 데이터베이스 조회 실패 (${dbRes.status}): ${body.slice(0, 300)}`);
+  }
+  const dbJson = (await dbRes.json()) as {
+    title?: NotionRichText[];
+    properties?: Record<string, unknown>;
+  };
+  return {
+    databaseTitle: plain(dbJson.title) || "WBS & Gantt",
+    properties: dbJson.properties ?? {},
+  };
+}
+
+export async function fetchNotionUsers(): Promise<AssigneePerson[]> {
+  const { headers } = getNotionConfig();
+  const people: AssigneePerson[] = [];
+  const seen = new Set<string>();
+  let cursor: string | undefined;
+  try {
+    do {
+      const url = new URL("https://api.notion.com/v1/users");
+      url.searchParams.set("page_size", "100");
+      if (cursor) url.searchParams.set("start_cursor", cursor);
+      const res = await fetch(url, { headers, cache: "no-store" });
+      if (!res.ok) break;
+      const json = (await res.json()) as {
+        results?: Array<{ id?: string; name?: string; type?: string }>;
+        has_more?: boolean;
+        next_cursor?: string | null;
+      };
+      for (const user of json.results ?? []) {
+        if (!user.id || user.type === "bot" || seen.has(user.id)) continue;
+        seen.add(user.id);
+        people.push({
+          id: user.id,
+          name: user.name?.trim() || "(이름 없음)",
+        });
+      }
+      cursor = json.has_more ? json.next_cursor ?? undefined : undefined;
+    } while (cursor);
+  } catch {
+    return people;
+  }
+  return people.sort((a, b) => a.name.localeCompare(b.name, "ko"));
+}
+
+export async function fetchWbsPage(pageId: string): Promise<{
+  task: Task;
+  inDatabase: boolean;
+}> {
+  if (!isNotionPageId(pageId)) {
+    throw new Error("페이지 ID가 올바르지 않습니다.");
+  }
+  const { headers } = getNotionConfig();
+  const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
+    headers,
+    cache: "no-store",
+  });
+  if (res.status === 404) {
+    throw new Error("노션 페이지를 찾지 못했습니다.");
+  }
+  if (!res.ok) {
+    const body = await res.text();
+    throw new Error(`노션 페이지 조회 실패 (${res.status}): ${body.slice(0, 300)}`);
+  }
+  const page = (await res.json()) as NotionPage;
+  const parsed = parseTask(page);
+  if (!parsed) {
+    throw new Error("페이지를 읽지 못했습니다.");
+  }
+  const { childIds: _childIds, parentIds: _parentIds, ...task } = parsed;
+  return {
+    task: {
+      ...task,
+      ownService: task.ownService ?? task.service,
+    },
+    inDatabase: page.parent?.type === "database_id" && isWbsDatabaseId(page.parent.database_id),
+  };
 }

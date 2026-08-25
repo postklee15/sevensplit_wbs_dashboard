@@ -93,6 +93,7 @@ npm run dev   # next dev --turbopack
 서버 (Next.js Route Handler, Cloud Function으로 호스팅)
   requireSevensplitUser  (jose + Google JWKS)
   fetchWbsTasks          (Notion API, NOTION_TOKEN은 서버만)
+  PATCH /api/wbs/[id]    (권한 있는 사용자만 속성 갱신)
   JSON { fetchedAt, databaseTitle, tasks }
 클라이언트
   Dashboard / WbsCalendar / PerformanceBoard
@@ -113,8 +114,11 @@ npm run dev   # next dev --turbopack
 | `components/WbsApp.tsx` | `/api/wbs` 호출, 세션 쿠키 |
 | `components/Dashboard.tsx` | 부하 뷰 + 보기 전환 |
 | `components/WbsCalendar.tsx` | 월력/주력 |
-| `components/TaskDetail.tsx` | 업무 상세. 「노션에서 수정하기」·일정 있으면 소요일 자동 |
+| `components/TaskDetail.tsx` | 업무 상세. 권한 있으면 폼+저장, 없으면 읽기. 「노션에서 열기」 |
 | `app/api/wbs/route.ts` | 인증 후 노션 fetch |
+| `app/api/wbs/schema/route.ts` | DB 스키마·사람 목록 |
+| `app/api/wbs/[id]/route.ts` | 페이지 GET·PATCH. 우리 DB만 |
+| `lib/notionWrite.ts` | 스키마 파싱·속성 쓰기 |
 | `lib/adminAuth.ts` | ID 토큰 검증 (`jose`, 이름은 admin이지만 firebase-admin 없음) |
 | `lib/sessionCookie.ts` | `wbs_token` 쿠키. 예전 `__session`은 지움 |
 | `lib/firebase.ts` | 클라이언트 Firebase 앱 |
@@ -189,13 +193,13 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 | 속성 | 타입 | 앱 필드 |
 |---|---|---|
 | 작업명 | title | `title` |
-| 담당자 | people | `assignees` |
-| 서비스 | select | `service` (비어 있으면 상위 트리에서 상속) |
+| 담당자 | people | `assignees`, `assigneePeople`(id). 저장은 people id |
+| 서비스 | select | `service` (비어 있으면 상위 트리에서 상속). 행 값은 `ownService`. 저장 시 빈 값은 속성을 비움 |
 | 업무속성 / 업무 속성 | select / multi_select / rich_text | `attribute`. 목록·상세 열 이름은 **업무속성** |
 | 중요도 | select / number / rich_text | `importance`. 작업 목록에서 속성 다음 열 |
 | 진척도 | number (0–1 또는 0–100) | `progress` |
 | 투입률 | number (0–1 또는 0–100) | `allocation` (없으면 부하 계산 시 100%) |
-| 소요일 | number | `effortDays` (잔여·부하 산정에는 쓰지 않음). 업무 상세는 일정이 있으면 시작~종료 달력 일수로 표시 |
+| 소요일 | number | `effortDays` (잔여·부하 산정에는 쓰지 않음). 업무 상세는 일정이 있으면 시작~종료 달력 일수로 표시. 숫자 속성이면 저장 가능 |
 | 추가일정 / 추가 일정 | number | `extraDays`. 양수면 종료일에 달력 일수를 더함 |
 | 일정 | date | `start` / `end`. 기한·잔여는 `end + extraDays` |
 | 상위/하위 항목 | relation | `isLeaf` = 하위 항목 0건. `ancestorTitles` = 루트→직계 상위 제목 |
@@ -267,15 +271,16 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 2. **Next config 경고** — Cloud Function 로그에 `Unrecognized key(s): '__esModule', 'default'`. firebase-frameworks가 `next.config.ts`를 감싸면서 생김. 앱 동작에는 보통 지장 없음.
 3. **CD가 이 커밋 전까지는 한 번도 `main`에서 안 돌아갔을 수 있음.** 푸시 후 workflow 성공 여부를 확인하세요.
 4. Hosting webframeworks는 **실험 기능**. `firebase-functions` peer / `firebase-admin` 버전 충돌이 났었음. admin을 다시 추가하면 frameworks 패키징이 깨질 수 있음.
-5. 캘린더/부하 필터는 클라이언트만. 노션 원본은 서버가 통째로 가져옴.
+5. 캘린더/부하 필터는 클라이언트만. `/api/wbs`는 팀장·슈퍼관리자에게 DB 통째, 팀원에게는 본인 담당만.
 6. 용량 5인일·평일만 배분·주말 제외는 제품 가정입니다. 바꾸려면 `WEEKLY_CAPACITY`와 `buildPersonRows`를 보면 됩니다.
+7. 업무 상세 저장은 `PATCH /api/wbs/[id]`. 팀장·슈퍼관리자 전체, 팀원은 `workName`이 담당자와 완전 일치할 때만. 인테그레이션에 DB 편집 권한이 필요하다.
 
 ---
 
 ## 11. 하지 말 것
 
 - `NOTION_TOKEN`을 git, 채팅, `docs/`, 커밋된 `.env.sevensplit-wbs-dashboard`에 넣지 말 것.
-- `/api/wbs`를 인증 없이 열지 말 것.
+- `/api/wbs`, `/api/wbs/schema`, `/api/wbs/[id]`를 인증 없이 열지 말 것.
 - 쿠키 이름을 다시 `__session`으로 되돌리지 말 것 (ID 토큰 ≠ Firebase session cookie).
 - `firebase-admin`으로 검증을 되돌리지 말 것 (Cloud Function에서 이미 실패).
 - `main` force push, `--no-verify` 커밋 금지 (사용자 규칙).
@@ -286,8 +291,9 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 ## 12. 다음 에이전트에게 추천하는 첫 작업
 
 1. GitHub Actions `Deploy` 워크플로가 이 푸시에서 초록인지 확인.
-2. 라이브에서 `@sevensplit.com` 로그인 → 대시보드 데이터 로드 확인.
-3. 필요하면 favicon, next.config 경고, 부하 가정(주 5인일) 조정을 이어가면 됨.
+2. 라이브에서 `@sevensplit.com` 로그인 → 대시보드 로드 → 업무 상세에서 저장(팀장 전체, 팀원은 본인만).
+3. 저장이 502면 노션 인테그레이션의 DB 편집 권한을 확인.
+4. 필요하면 favicon, next.config 경고, 부하 가정(주 5인일) 조정을 이어가면 됨.
 
 로그 확인:
 

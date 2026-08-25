@@ -25,7 +25,8 @@ body {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -1049,7 +1050,7 @@ table.tasks {
 
 .task-detail-panel {
   position: relative;
-  width: min(440px, 100%);
+  width: min(520px, 100%);
   height: 100%;
   overflow: auto;
   background: var(--paper);
@@ -1132,6 +1133,82 @@ table.tasks {
 .task-detail-note {
   margin: 20px 0 0;
   font-size: 12px;
+}
+
+.task-detail-title-input {
+  display: block;
+  width: 100%;
+  margin: 4px 0 12px;
+  padding: 6px 8px;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.35;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: var(--ink);
+}
+
+.task-detail-form .task-detail-field input,
+.task-detail-form .task-detail-field select,
+.task-detail-form .task-detail-field textarea {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--paper);
+  color: var(--ink);
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 14px;
+}
+
+.task-detail-form textarea {
+  resize: vertical;
+  min-height: 88px;
+}
+
+.task-detail-dates {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.task-detail-dates input {
+  min-width: 0;
+}
+
+.task-detail-checks {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 180px;
+  overflow: auto;
+}
+
+.task-detail-checks label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.task-detail-checks input {
+  width: auto;
+}
+
+.task-detail-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+}
+
+.task-detail-ok {
+  margin: 12px 0 0;
+  color: var(--ok);
+  font-size: 13px;
+}
+
+.task-detail-save-row {
+  margin-top: 16px;
 }
 
 @media (max-width: 980px) {
