@@ -113,6 +113,7 @@ npm run dev   # next dev --turbopack
 | `components/WbsApp.tsx` | `/api/wbs` 호출, 세션 쿠키 |
 | `components/Dashboard.tsx` | 부하 뷰 + 보기 전환 |
 | `components/WbsCalendar.tsx` | 월력/주력 |
+| `components/TaskDetail.tsx` | 업무 상세. 「노션에서 수정하기」·일정 있으면 소요일 자동 |
 | `app/api/wbs/route.ts` | 인증 후 노션 fetch |
 | `lib/adminAuth.ts` | ID 토큰 검증 (`jose`, 이름은 admin이지만 firebase-admin 없음) |
 | `lib/sessionCookie.ts` | `wbs_token` 쿠키. 예전 `__session`은 지움 |
@@ -194,7 +195,7 @@ gcloud functions logs read ssrsevensplitwbsdashboa \
 | 중요도 | select / number / rich_text | `importance`. 작업 목록에서 속성 다음 열 |
 | 진척도 | number (0–1 또는 0–100) | `progress` |
 | 투입률 | number (0–1 또는 0–100) | `allocation` (없으면 부하 계산 시 100%) |
-| 소요일 | number | `effortDays` (표시만. 잔여·부하·성과 산정에는 쓰지 않음) |
+| 소요일 | number | `effortDays` (잔여·부하 산정에는 쓰지 않음). 업무 상세는 일정이 있으면 시작~종료 달력 일수로 표시 |
 | 추가일정 / 추가 일정 | number | `extraDays`. 양수면 종료일에 달력 일수를 더함 |
 | 일정 | date | `start` / `end`. 기한·잔여는 `end + extraDays` |
 | 상위/하위 항목 | relation | `isLeaf` = 하위 항목 0건. `ancestorTitles` = 루트→직계 상위 제목 |

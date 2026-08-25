@@ -85,6 +85,12 @@ export function scheduleSpanDays(task: Task, end = effectiveEnd(task)): number {
   return Math.max(1, Math.round((last.getTime() - start.getTime()) / 86400000) + 1);
 }
 
+/** 잡은 일정의 달력 일수(양끝 포함). 추가 일정은 빼 둔다. 일정 없으면 null. */
+export function plannedEffortDays(task: Task): number | null {
+  if (!task.start) return null;
+  return scheduleSpanDays(task, originalEnd(task));
+}
+
 export function remainingEffort(task: Task): number {
   if (!task.start) return 0;
   const ratio = progressRatio(task);

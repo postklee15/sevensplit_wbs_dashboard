@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Task } from "@/lib/types";
-import { UNASSIGNED, effectiveEnd, extraScheduleDays, remainingEffort, taskStatus, todayKst } from "@/lib/metrics";
+import { UNASSIGNED, effectiveEnd, extraScheduleDays, plannedEffortDays, remainingEffort, taskStatus, todayKst } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 
 export type TaskView = Pick<Task, "id" | "title"> & Partial<Omit<Task, "id" | "title">>;
@@ -124,7 +124,15 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
   const assignees = task.assignees.length ? task.assignees.join(", ") : UNASSIGNED;
   const extra = extraScheduleDays(task);
   const extendedEnd = extra > 0 ? effectiveEnd(task) : null;
+  const planned = plannedEffortDays(task);
   const showRemaining = Boolean(task.start);
+  const showEffort = planned != null || hasField(view, "effortDays");
+  const effortLabel =
+    planned != null
+      ? `${fmt(planned)}인일`
+      : task.effortDays == null
+        ? "—"
+        : `${fmt(task.effortDays)}인일`;
 
   return (
     <div className="task-detail-root">
@@ -132,9 +140,21 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
       <aside className="task-detail-panel" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
         <header className="task-detail-head">
           <p className="kicker">업무 상세</p>
-          <button className="chip" type="button" onClick={onClose}>
-            닫기
-          </button>
+          <div className="task-detail-actions">
+            {task.url ? (
+              <a
+                className="chip on"
+                href={task.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                노션에서 수정하기
+              </a>
+            ) : null}
+            <button className="chip" type="button" onClick={onClose}>
+              닫기
+            </button>
+          </div>
         </header>
         {path.length > 0 ? <p className="title-path">{path.join(" / ")}</p> : null}
         <h2 id="task-detail-title">{task.title}</h2>
@@ -160,9 +180,7 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
           ) : null}
           {hasField(view, "progress") ? <Field label="진척">{pct(task.progress)}</Field> : null}
           {hasField(view, "allocation") ? <Field label="투입률">{pct(task.allocation)}</Field> : null}
-          {hasField(view, "effortDays") ? (
-            <Field label="소요일">{task.effortDays == null ? "—" : `${fmt(task.effortDays)}인일`}</Field>
-          ) : null}
+          {showEffort ? <Field label="소요일">{effortLabel}</Field> : null}
           {showRemaining ? (
             <Field label="잔여">{fmt(remainingEffort(task))}인일</Field>
           ) : null}
@@ -176,7 +194,7 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
           {issue ? <p>{issue}</p> : <p className="muted">적힌 내용이 없습니다.</p>}
         </section>
         <p className="task-detail-note muted">
-          노션에서 읽은 속성입니다. 수정은 노션에서 합니다.
+          이 화면은 읽기만 됩니다. 수정은 「노션에서 수정하기」로 해당 페이지를 엽니다.
         </p>
       </aside>
     </div>
