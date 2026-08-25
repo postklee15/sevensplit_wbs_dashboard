@@ -306,6 +306,7 @@ function SchemaInput({
   if (multiline || field.type === "rich_text") {
     return (
       <textarea
+        className="task-detail-wide"
         rows={multiline ? 5 : 3}
         value={value}
         onChange={(event) => onChange(event.target.value)}

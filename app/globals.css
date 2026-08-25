@@ -1114,6 +1114,12 @@ table.tasks {
   font-size: 14px;
 }
 
+.task-detail-issue {
+  display: block;
+  width: 100%;
+  min-width: 0;
+}
+
 .task-detail-issue + .task-detail-issue {
   margin-top: 20px;
 }
@@ -1152,8 +1158,13 @@ table.tasks {
 
 .task-detail-form .task-detail-field input,
 .task-detail-form .task-detail-field select,
-.task-detail-form .task-detail-field textarea {
+.task-detail-form .task-detail-field textarea,
+.task-detail-form .task-detail-issue input,
+.task-detail-form .task-detail-issue select,
+.task-detail-form .task-detail-issue textarea {
   width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   border: 1px solid var(--line);
   background: var(--paper);
   color: var(--ink);
@@ -1162,9 +1173,22 @@ table.tasks {
   font-size: 14px;
 }
 
+.task-detail-form .task-detail-issue textarea {
+  display: block;
+  resize: vertical;
+  min-height: 120px;
+}
+
 .task-detail-form textarea {
   resize: vertical;
   min-height: 88px;
+}
+
+.task-detail-wide {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .task-detail-dates {
