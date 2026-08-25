@@ -60,6 +60,13 @@ function attributeValue(prop: NotionProperty | undefined): string | null {
   return formula || null;
 }
 
+function displayValue(prop: NotionProperty | undefined): string | null {
+  const text = attributeValue(prop);
+  if (text) return text;
+  const n = numberValue(prop);
+  return n == null ? null : String(n);
+}
+
 function extraDaysValue(prop: NotionProperty | undefined): number | null {
   const n = numberValue(prop);
   if (n != null) return n;
@@ -99,6 +106,7 @@ export function parseTask(page: NotionPage): ParsedTask | null {
       .filter((name): name is string => Boolean(name)),
     service: props["서비스"]?.select?.name?.trim() || null,
     attribute: attributeValue(props["업무 속성"]),
+    importance: displayValue(pickProp(props, ["중요도"])),
     progress: numberValue(props["진척도"]),
     allocation: numberValue(props["투입률"]),
     effortDays: numberValue(props["소요일"]),

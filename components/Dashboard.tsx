@@ -236,7 +236,7 @@ export function Dashboard({
             </button>
           </div>
           <input
-            placeholder="상위 작업, 작업명, 속성, 이슈 검색"
+            placeholder="상위 작업, 작업명, 속성, 중요도, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -608,6 +608,7 @@ function TaskTable({
           <th className="col-status">상태</th>
           <th className="col-service">서비스</th>
           <th>속성</th>
+          <th>중요도</th>
           <th>작업</th>
           <th>담당</th>
           <th>일정</th>
@@ -617,7 +618,7 @@ function TaskTable({
       </thead>
       <tbody>
         <tr className="task-group">
-          <th colSpan={8}>{heading}</th>
+          <th colSpan={9}>{heading}</th>
         </tr>
         {tasks.map((task) => (
           <TaskRow key={task.id} task={task} today={today} />
@@ -637,6 +638,7 @@ function TaskRow({ task, today }: { task: Task; today: string }) {
       </td>
       <td className="col-service">{task.service ?? "—"}</td>
       <td>{task.attribute ?? "—"}</td>
+      <td>{task.importance ?? "—"}</td>
       <td>
         <TaskTitle task={task} />
       </td>

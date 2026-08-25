@@ -188,7 +188,7 @@ export function filterTasks(
     if (q) {
       const path = (task.ancestorTitles ?? []).join(" ");
       const hay =
-        `${path} ${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue} ${task.delayReason ?? ""}`.toLowerCase();
+        `${path} ${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.importance ?? ""} ${task.issue} ${task.delayReason ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;

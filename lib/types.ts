@@ -8,6 +8,7 @@ export type Task = {
   /** 노션 서비스. 비어 있으면 상위 트리에서 가장 가까운 값을 상속. */
   service: string | null;
   attribute: string | null;
+  importance: string | null;
   progress: number | null;
   allocation: number | null;
   effortDays: number | null;

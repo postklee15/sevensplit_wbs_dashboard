@@ -283,7 +283,7 @@ export function MyWorkBoard({
             </button>
           </div>
           <input
-            placeholder="상위 작업, 작업명, 속성, 이슈 검색"
+            placeholder="상위 작업, 작업명, 속성, 중요도, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -366,6 +366,7 @@ export function MyWorkBoard({
                   <th>일정승인</th>
                   <th>서비스</th>
                   <th>속성</th>
+                  <th>중요도</th>
                   <th>작업</th>
                   <th>일정</th>
                   <th>진척</th>
@@ -386,6 +387,7 @@ export function MyWorkBoard({
                       </td>
                       <td>{task.service ?? "—"}</td>
                       <td>{task.attribute ?? "—"}</td>
+                      <td>{task.importance ?? "—"}</td>
                       <td>
                         <TaskTitle task={task} />
                       </td>
