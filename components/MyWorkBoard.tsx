@@ -283,7 +283,7 @@ export function MyWorkBoard({
             </button>
           </div>
           <input
-            placeholder="상위 작업, 작업명, 속성, 중요도, 이슈 검색"
+            placeholder="상위 작업, 작업명, 업무속성, 중요도, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -365,7 +365,7 @@ export function MyWorkBoard({
                   <th>상태</th>
                   <th>일정승인</th>
                   <th>서비스</th>
-                  <th>속성</th>
+                  <th>업무속성</th>
                   <th>중요도</th>
                   <th>작업</th>
                   <th>일정</th>

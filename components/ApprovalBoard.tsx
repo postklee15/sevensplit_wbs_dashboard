@@ -124,7 +124,7 @@ export function ApprovalBoard({ token }: { token: string }) {
         </div>
         <div className="controls">
           <input
-            placeholder="상위 작업, 작업명, 속성, 중요도, 이슈 검색"
+            placeholder="상위 작업, 작업명, 업무속성, 중요도, 이슈 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -225,7 +225,7 @@ export function ApprovalBoard({ token }: { token: string }) {
                     <th className="col-approval">일정승인</th>
                     <th className="col-status">상태</th>
                     <th className="col-service">서비스</th>
-                    <th>속성</th>
+                    <th>업무속성</th>
                     <th>중요도</th>
                     <th>작업</th>
                     <th>담당</th>

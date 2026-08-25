@@ -56,6 +56,8 @@ function attributeValue(prop: NotionProperty | undefined): string | null {
   if (multi.length) return multi.join(", ");
   const text = plain(prop.rich_text);
   if (text) return text;
+  const title = plain(prop.title);
+  if (title) return title;
   const formula = prop.formula?.string?.trim();
   return formula || null;
 }
@@ -105,7 +107,7 @@ export function parseTask(page: NotionPage): ParsedTask | null {
       .map((person) => person.name?.trim())
       .filter((name): name is string => Boolean(name)),
     service: props["서비스"]?.select?.name?.trim() || null,
-    attribute: attributeValue(props["업무 속성"]),
+    attribute: displayValue(pickProp(props, ["업무속성", "업무 속성"])),
     importance: displayValue(pickProp(props, ["중요도"])),
     progress: numberValue(props["진척도"]),
     allocation: numberValue(props["투입률"]),

@@ -166,7 +166,7 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
         </div>
         <dl className="task-detail-grid">
           <Field label="서비스">{task.service ?? "—"}</Field>
-          <Field label="속성">{task.attribute ?? "—"}</Field>
+          <Field label="업무속성">{task.attribute ?? "—"}</Field>
           <Field label="중요도">{task.importance ?? "—"}</Field>
           <Field label="담당">{assignees}</Field>
           <Field label="일정">{dateRange(task)}</Field>
