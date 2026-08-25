@@ -607,10 +607,10 @@ function TaskTable({
         <tr>
           <th className="col-status">상태</th>
           <th className="col-service">서비스</th>
-          <th>업무속성</th>
-          <th>중요도</th>
+          <th className="col-attribute">업무속성</th>
+          <th className="col-importance">중요도</th>
           <th>작업</th>
-          <th>담당</th>
+          <th className="col-assignee">담당</th>
           <th>일정</th>
           <th>진척</th>
           <th>잔여</th>
@@ -637,12 +637,12 @@ function TaskRow({ task, today }: { task: Task; today: string }) {
         <span className={`badge ${status}`}>{status}</span>
       </td>
       <td className="col-service">{task.service ?? "—"}</td>
-      <td>{task.attribute ?? "—"}</td>
-      <td>{task.importance ?? "—"}</td>
+      <td className="col-attribute">{task.attribute ?? "—"}</td>
+      <td className="col-importance">{task.importance ?? "—"}</td>
       <td>
         <TaskTitle task={task} />
       </td>
-      <td>
+      <td className="col-assignee">
         {unassigned ? <span className="badge 미지정">미지정</span> : task.assignees.join(", ")}
       </td>
       <td>{dateRange(task)}</td>

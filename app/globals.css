@@ -553,7 +553,10 @@ table.tasks {
 }
 .tasks .col-status,
 .tasks .col-service,
-.tasks .col-approval {
+.tasks .col-approval,
+.tasks .col-attribute,
+.tasks .col-importance,
+.tasks .col-assignee {
   white-space: nowrap;
   width: 1%;
   vertical-align: middle;
