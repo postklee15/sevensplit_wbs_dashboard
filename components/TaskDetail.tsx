@@ -10,7 +10,7 @@ import {
   type ReactNode,
 } from "react";
 import type { Task } from "@/lib/types";
-import { UNASSIGNED, remainingEffort, taskStatus, todayKst } from "@/lib/metrics";
+import { UNASSIGNED, effectiveEnd, extraScheduleDays, remainingEffort, taskStatus, todayKst } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 
 export type TaskView = Pick<Task, "id" | "title"> & Partial<Omit<Task, "id" | "title">>;
@@ -42,11 +42,13 @@ function toTask(view: TaskView): Task {
     progress: view.progress ?? null,
     allocation: view.allocation ?? null,
     effortDays: view.effortDays ?? null,
+    extraDays: view.extraDays ?? null,
     start: view.start ?? null,
     end: view.end ?? null,
     scheduleApproval: view.scheduleApproval ?? null,
     deployApproval: view.deployApproval ?? null,
     issue: view.issue ?? "",
+    delayReason: view.delayReason ?? null,
     isLeaf: view.isLeaf ?? true,
   };
 }
@@ -117,8 +119,11 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
   const status = taskStatus(task, today);
   const path = task.ancestorTitles.filter(Boolean);
   const issue = task.issue.trim();
+  const delayReason = (task.delayReason ?? "").trim();
   const assignees = task.assignees.length ? task.assignees.join(", ") : UNASSIGNED;
-  const showRemaining = task.effortDays != null || Boolean(task.start);
+  const extra = extraScheduleDays(task);
+  const extendedEnd = extra > 0 ? effectiveEnd(task) : null;
+  const showRemaining = Boolean(task.start);
 
   return (
     <div className="task-detail-root">
@@ -143,18 +148,27 @@ function TaskDetailPanel({ task: view, onClose }: { task: TaskView; onClose: () 
           <Field label="속성">{task.attribute ?? "—"}</Field>
           <Field label="담당">{assignees}</Field>
           <Field label="일정">{dateRange(task)}</Field>
+          <Field label="추가 일정">
+            {extra <= 0
+              ? "—"
+              : `${extra}일${extendedEnd ? ` · 연장 종료 ${extendedEnd}` : ""}`}
+          </Field>
           {hasField(view, "deployApproval") ? (
             <Field label="배포승인">{task.deployApproval?.trim() || "—"}</Field>
           ) : null}
           {hasField(view, "progress") ? <Field label="진척">{pct(task.progress)}</Field> : null}
           {hasField(view, "allocation") ? <Field label="투입률">{pct(task.allocation)}</Field> : null}
-          {hasField(view, "effortDays") || task.start ? (
+          {hasField(view, "effortDays") ? (
             <Field label="소요일">{task.effortDays == null ? "—" : `${fmt(task.effortDays)}인일`}</Field>
           ) : null}
           {showRemaining ? (
             <Field label="잔여">{fmt(remainingEffort(task))}인일</Field>
           ) : null}
         </dl>
+        <section className="task-detail-issue">
+          <h3>지연사유</h3>
+          {delayReason ? <p>{delayReason}</p> : <p className="muted">적힌 내용이 없습니다.</p>}
+        </section>
         <section className="task-detail-issue">
           <h3>내용 / 이슈</h3>
           {issue ? <p>{issue}</p> : <p className="muted">적힌 내용이 없습니다.</p>}

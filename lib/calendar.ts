@@ -1,5 +1,5 @@
 import type { Task } from "./types";
-import { addDays, formatYmd, mondayOf, parseYmd } from "./metrics";
+import { addDays, effectiveEnd, formatYmd, mondayOf, parseYmd } from "./metrics";
 
 export const WEEKDAYS = ["월", "화", "수", "목", "금", "토", "일"] as const;
 
@@ -29,7 +29,7 @@ export function rangesOverlap(
 
 export function taskRange(task: Task): { start: string; end: string } | null {
   if (!task.start) return null;
-  return { start: task.start, end: task.end ?? task.start };
+  return { start: task.start, end: effectiveEnd(task) ?? task.start };
 }
 
 export function taskOverlapsRange(task: Task, start: string, end: string): boolean {
@@ -73,11 +73,13 @@ export function layoutWeekLanes(tasks: Task[], weekStart: string): LaneItem[] {
   const overlapping = tasks
     .filter((task) => taskOverlapsRange(task, weekStart, weekEnd))
     .sort((a, b) => {
-      const aStart = maxYmd(a.start ?? weekStart, weekStart);
-      const bStart = maxYmd(b.start ?? weekStart, weekStart);
+      const aRange = taskRange(a);
+      const bRange = taskRange(b);
+      const aStart = maxYmd(aRange?.start ?? weekStart, weekStart);
+      const bStart = maxYmd(bRange?.start ?? weekStart, weekStart);
       if (aStart !== bStart) return aStart.localeCompare(bStart);
-      const aEnd = minYmd(a.end ?? a.start ?? weekEnd, weekEnd);
-      const bEnd = minYmd(b.end ?? b.start ?? weekEnd, weekEnd);
+      const aEnd = minYmd(aRange?.end ?? weekEnd, weekEnd);
+      const bEnd = minYmd(bRange?.end ?? weekEnd, weekEnd);
       return bEnd.localeCompare(aEnd);
     });
 
@@ -85,8 +87,10 @@ export function layoutWeekLanes(tasks: Task[], weekStart: string): LaneItem[] {
   const items: LaneItem[] = [];
 
   for (const task of overlapping) {
-    const start = maxYmd(task.start ?? weekStart, weekStart);
-    const end = minYmd(task.end ?? task.start ?? weekEnd, weekEnd);
+    const range = taskRange(task);
+    if (!range) continue;
+    const start = maxYmd(range.start, weekStart);
+    const end = minYmd(range.end, weekEnd);
     const startCol = dayIndex(weekStart, start);
     const endCol = dayIndex(weekStart, end);
     const span = Math.max(1, endCol - startCol + 1);

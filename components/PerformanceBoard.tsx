@@ -35,6 +35,8 @@ type Payload = {
     assignees: string[];
     start: string | null;
     end: string | null;
+    extraDays: number | null;
+    delayReason: string | null;
     effortDays: number;
   }>;
 };
@@ -92,7 +94,7 @@ export function PerformanceBoard({ token }: { token: string; profile: AccessProf
         <div>
           <p className="kicker">Split Invest · {payload?.databaseTitle ?? "WBS"}</p>
           <h1>인원별 성과</h1>
-          <p className="sub">완료 처리된 하위 작업만 집계합니다. 공수는 소요일(없으면 일정 일수)을 담당자 수로 나눕니다.</p>
+          <p className="sub">완료 처리된 하위 작업만 집계합니다. 공수는 일정 일수를 담당자 수로 나눕니다. 소요일은 쓰지 않습니다.</p>
         </div>
         <div className="controls">
           <label className="date-field">

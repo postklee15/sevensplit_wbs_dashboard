@@ -15,7 +15,7 @@ type NotionProperty = {
   multi_select?: NotionSelect[];
   status?: NotionSelect;
   number?: number | null;
-  formula?: { type?: string; number?: number | null };
+  formula?: { type?: string; number?: number | null; string?: string | null };
   date?: NotionDate;
   url?: string | null;
   relation?: NotionRelation[];
@@ -55,7 +55,30 @@ function attributeValue(prop: NotionProperty | undefined): string | null {
     .filter((name): name is string => Boolean(name));
   if (multi.length) return multi.join(", ");
   const text = plain(prop.rich_text);
-  return text || null;
+  if (text) return text;
+  const formula = prop.formula?.string?.trim();
+  return formula || null;
+}
+
+function extraDaysValue(prop: NotionProperty | undefined): number | null {
+  const n = numberValue(prop);
+  if (n != null) return n;
+  const text = attributeValue(prop);
+  if (!text) return null;
+  const match = text.replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  if (!match) return null;
+  const parsed = Number(match[0]);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function pickProp(
+  props: Record<string, NotionProperty>,
+  names: string[],
+): NotionProperty | undefined {
+  for (const name of names) {
+    if (Object.prototype.hasOwnProperty.call(props, name)) return props[name];
+  }
+  return undefined;
 }
 
 type ParsedTask = Task & { childIds: string[]; parentIds: string[] };
@@ -79,11 +102,13 @@ export function parseTask(page: NotionPage): ParsedTask | null {
     progress: numberValue(props["진척도"]),
     allocation: numberValue(props["투입률"]),
     effortDays: numberValue(props["소요일"]),
+    extraDays: extraDaysValue(pickProp(props, ["추가일정", "추가 일정"])),
     start: ymd(props["일정"]?.date?.start),
     end: ymd(props["일정"]?.date?.end) ?? ymd(props["일정"]?.date?.start),
     scheduleApproval: props["일정승인"]?.select?.name ?? null,
     deployApproval: props["배포승인"]?.select?.name ?? null,
     issue: plain(props["내용/이슈"]?.rich_text),
+    delayReason: attributeValue(pickProp(props, ["지연사유", "지연 사유"])),
     isLeaf: childIds.length === 0,
     childIds,
     parentIds,

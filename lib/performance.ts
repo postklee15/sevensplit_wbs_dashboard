@@ -1,5 +1,5 @@
 import type { Task } from "./types";
-import { UNASSIGNED, parseYmd, progressRatio, taskStatus } from "./metrics";
+import { UNASSIGNED, progressRatio, scheduleSpanDays, taskStatus } from "./metrics";
 
 export type PersonPerformance = {
   name: string;
@@ -29,18 +29,14 @@ export type PerformancePayload = {
     assignees: string[];
     start: string | null;
     end: string | null;
+    extraDays: number | null;
+    delayReason: string | null;
     effortDays: number;
   }>;
 };
 
 function completedEffort(task: Task): number {
-  if (task.effortDays != null && Number.isFinite(task.effortDays)) {
-    return Math.max(0, task.effortDays);
-  }
-  if (!task.start) return 0;
-  const start = parseYmd(task.start);
-  const end = parseYmd(task.end ?? task.start);
-  return Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
+  return scheduleSpanDays(task, task.end ?? task.start);
 }
 
 function inRange(task: Task, from: string | null, to: string | null): boolean {
@@ -116,6 +112,8 @@ export function buildPerformance(
         assignees: task.assignees,
         start: task.start,
         end: task.end,
+        extraDays: task.extraDays,
+        delayReason: task.delayReason,
         effortDays: completedEffort(task),
       }))
       .sort((a, b) => (b.end ?? b.start ?? "").localeCompare(a.end ?? a.start ?? "")),

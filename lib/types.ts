@@ -11,15 +11,18 @@ export type Task = {
   progress: number | null;
   allocation: number | null;
   effortDays: number | null;
+  /** 노션 추가일정. 양수일 때만 종료일을 달력 일수만큼 연장. */
+  extraDays: number | null;
   start: string | null;
   end: string | null;
   scheduleApproval: string | null;
   deployApproval: string | null;
   issue: string;
+  delayReason: string | null;
   isLeaf: boolean;
 };
 
-export type TaskStatus = "완료" | "진행중" | "예정" | "기한초과" | "일정없음";
+export type TaskStatus = "완료" | "진행중" | "예정" | "기한초과" | "기한연장" | "일정없음";
 
 export type PersonRow = {
   name: string;

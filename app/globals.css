@@ -623,6 +623,12 @@ table.tasks {
   background: #fbe8e4;
 }
 
+.badge.기한연장 {
+  color: #7a5b12;
+  border-color: #ead9a8;
+  background: #f6efd8;
+}
+
 .badge.진행중 {
   color: var(--busy);
   border-color: #f3d2a4;
@@ -969,6 +975,11 @@ table.tasks {
   border-left-color: var(--over);
 }
 
+.cal-event.기한연장 {
+  background: #f6efd8;
+  border-left-color: #c4a35a;
+}
+
 .cal-event.진행중 {
   background: #f8ead6;
   border-left-color: var(--busy);
@@ -1089,6 +1100,10 @@ table.tasks {
 .task-detail-field dd {
   margin: 0;
   font-size: 14px;
+}
+
+.task-detail-issue + .task-detail-issue {
+  margin-top: 20px;
 }
 
 .task-detail-issue h3 {

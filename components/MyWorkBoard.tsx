@@ -10,6 +10,7 @@ import {
   filterTasks,
   remainingEffort,
   servicesOf,
+  STATUS_SORT,
   taskStatus,
   todayKst,
 } from "@/lib/metrics";
@@ -213,8 +214,7 @@ export function MyWorkBoard({
       query,
       today,
     }).sort((a, b) => {
-      const order = { 기한초과: 0, 진행중: 1, 예정: 2, 일정없음: 3, 완료: 4 };
-      const d = order[taskStatus(a, today)] - order[taskStatus(b, today)];
+      const d = STATUS_SORT[taskStatus(a, today)] - STATUS_SORT[taskStatus(b, today)];
       if (d !== 0) return d;
       return (a.start ?? "9999").localeCompare(b.start ?? "9999");
     });
@@ -394,7 +394,7 @@ export function MyWorkBoard({
                         {task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}
                       </td>
                       <td>
-                        {task.effortDays == null && !task.start ? "—" : fmt(remainingEffort(task))}
+                        {task.start ? fmt(remainingEffort(task)) : "—"}
                       </td>
                     </tr>
                   );

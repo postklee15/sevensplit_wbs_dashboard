@@ -23,6 +23,7 @@ import {
   remainingEffort,
   servicesOf,
   summary,
+  STATUS_SORT,
   taskStatus,
   todayKst,
   unassignedDisplayName,
@@ -163,8 +164,7 @@ export function Dashboard({
         query,
         today,
       }).sort((a, b) => {
-        const order = { 기한초과: 0, 진행중: 1, 예정: 2, 일정없음: 3, 완료: 4 };
-        const d = order[taskStatus(a, today)] - order[taskStatus(b, today)];
+        const d = STATUS_SORT[taskStatus(a, today)] - STATUS_SORT[taskStatus(b, today)];
         if (d !== 0) return d;
         return (a.start ?? "9999").localeCompare(b.start ?? "9999");
       }),
@@ -374,8 +374,8 @@ export function Dashboard({
       </div>
       <p className="hint heat-hint">
         미완료 잔여 공수를 남은 평일에 균등 배분했습니다. 기한 초과분은 이번 주에 몰아 표시합니다.
-        소요일이 없으면 일정 기간으로 추정합니다. 일정과 소요일이 모두 없으면 미정으로 보고 부하에서 제외합니다.
-        투입률이 있으면 잔여 공수에 곱하고, 없으면 100%로 봅니다.
+        잔여는 일정 기간(추가 일정이 있으면 연장 종료일까지) × (1−진척) × 투입률입니다. 일정이 없으면 미정으로 보고 부하에서 제외합니다.
+        소요일은 산정에 쓰지 않습니다. 투입률이 없으면 100%로 봅니다.
         {heatGrain === "week"
           ? " 주 머리글이나 칸을 누르면 그 주의 일간(월–금)을 봅니다."
           : ` ${weekSpan(weeks[heatWeek] ?? weeks[0])} 평일 배분입니다. 색은 하루 ${DAILY_CAPACITY}인일 기준입니다.`}
@@ -645,7 +645,7 @@ function TaskRow({ task, today }: { task: Task; today: string }) {
       </td>
       <td>{dateRange(task)}</td>
       <td>{task.progress == null ? "—" : `${Math.round(progressRatioPct(task))}%`}</td>
-      <td>{task.effortDays == null && !task.start ? "—" : fmt(remainingEffort(task))}</td>
+      <td>{task.start ? fmt(remainingEffort(task)) : "—"}</td>
     </tr>
   );
 }

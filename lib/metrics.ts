@@ -56,23 +56,57 @@ export function allocationRatio(task: Task): number {
   return Math.min(Math.max(0, task.allocation), 100) / 100;
 }
 
-export function remainingEffort(task: Task): number {
-  const ratio = progressRatio(task);
-  let effort = task.effortDays;
-  if (effort == null) {
-    if (!task.start) return 0;
-    const start = parseYmd(task.start);
-    const end = parseYmd(task.end ?? task.start);
-    effort = Math.max(1, Math.round((end.getTime() - start.getTime()) / 86400000) + 1);
-  }
-  return Math.max(0, effort * (1 - ratio) * allocationRatio(task));
+/** 노션 추가일정. 양수만 쓰고 소수점은 버림. */
+export function extraScheduleDays(task: Task): number {
+  const n = task.extraDays;
+  if (n == null || !Number.isFinite(n) || n <= 0) return 0;
+  return Math.floor(n);
 }
+
+export function originalEnd(task: Task): string | null {
+  if (!task.start) return null;
+  return task.end ?? task.start;
+}
+
+/** 추가 일정을 더한 종료일. 기한·잔여 산정에 쓴다. */
+export function effectiveEnd(task: Task): string | null {
+  const end = originalEnd(task);
+  if (!end) return null;
+  const extra = extraScheduleDays(task);
+  if (extra <= 0) return end;
+  return formatYmd(addDays(parseYmd(end), extra));
+}
+
+/** 시작~종료(추가 일정 반영) 달력 일수. 양끝 포함, 최소 1. 일정 없으면 0. */
+export function scheduleSpanDays(task: Task, end = effectiveEnd(task)): number {
+  if (!task.start) return 0;
+  const start = parseYmd(task.start);
+  const last = parseYmd(end ?? task.start);
+  return Math.max(1, Math.round((last.getTime() - start.getTime()) / 86400000) + 1);
+}
+
+export function remainingEffort(task: Task): number {
+  if (!task.start) return 0;
+  const ratio = progressRatio(task);
+  return Math.max(0, scheduleSpanDays(task) * (1 - ratio) * allocationRatio(task));
+}
+
+export const STATUS_SORT: Record<TaskStatus, number> = {
+  기한초과: 0,
+  기한연장: 1,
+  진행중: 2,
+  예정: 3,
+  일정없음: 4,
+  완료: 5,
+};
 
 export function taskStatus(task: Task, today = todayKst()): TaskStatus {
   if (progressRatio(task) >= 1) return "완료";
   if (!task.start) return "일정없음";
-  const end = task.end ?? task.start;
-  if (end < today) return "기한초과";
+  const original = originalEnd(task) ?? task.start;
+  const effective = effectiveEnd(task) ?? task.start;
+  if (effective < today) return "기한초과";
+  if (extraScheduleDays(task) > 0 && original < today) return "기한연장";
   if (task.start > today) return "예정";
   return "진행중";
 }
@@ -153,7 +187,8 @@ export function filterTasks(
     }
     if (q) {
       const path = (task.ancestorTitles ?? []).join(" ");
-      const hay = `${path} ${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue}`.toLowerCase();
+      const hay =
+        `${path} ${task.title} ${task.service ?? ""} ${task.attribute ?? ""} ${task.issue} ${task.delayReason ?? ""}`.toLowerCase();
       if (!hay.includes(q)) return false;
     }
     return true;
@@ -254,7 +289,7 @@ export function buildPersonRows(
       if (status === "완료") row.done += 1;
       else {
         row.open += 1;
-        if (status === "진행중") row.inProgress += 1;
+        if (status === "진행중" || status === "기한연장") row.inProgress += 1;
         else if (status === "예정") row.upcoming += 1;
         else if (status === "기한초과") row.overdue += 1;
         else row.noDate += 1;
@@ -268,7 +303,7 @@ export function buildPersonRows(
       continue;
     }
 
-    const end = task.end ?? task.start;
+    const end = effectiveEnd(task) ?? task.start;
     if (end < today) {
       const dump = overdueBucketDay(today, weeks[0] ?? today);
       const dumpDay = weekdayIndex(dump);
