@@ -28,6 +28,17 @@ export function divisionsOf(units: OrgUnit[]): OrgUnit[] {
     .sort((a, b) => a.name.localeCompare(b.name, "ko"));
 }
 
+/** 슈퍼관리자는 모든 본부, 그 외는 자기 본부만. */
+export function divisionsVisibleTo(
+  actor: { role: string; divisionId: string },
+  units: OrgUnit[],
+): OrgUnit[] {
+  const all = divisionsOf(units);
+  if (actor.role === "superAdmin") return all;
+  if (actor.divisionId) return all.filter((unit) => unit.id === actor.divisionId);
+  return all;
+}
+
 export function teamsOf(units: OrgUnit[], divisionId: string): OrgUnit[] {
   return units
     .filter((unit) => unit.kind === "team" && unit.parentId === divisionId)

@@ -6,11 +6,12 @@ import { pageGroups } from "@/lib/pager";
 import type { AccessProfile } from "@/lib/acl";
 import { canViewAllLoad } from "@/lib/acl";
 import type { DashboardPayload, Task } from "@/lib/types";
-import { divisionsOf, teamsOf, taskMatchesOrgNames, unitName, workNamesForSelection } from "@/lib/org";
+import { divisionsVisibleTo, teamsOf, taskMatchesOrgNames, unitName, workNamesForSelection } from "@/lib/org";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { TaskTitle } from "@/components/TaskTitle";
 import { TaskScopeChips } from "@/components/TaskScopeChips";
 import { TaskFamilyBody, type TaskFamilyRowMeta } from "@/components/TaskFamilyBody";
+import { DivisionChips } from "@/components/DivisionChips";
 import { groupTasksByRoot, treeDepthOf, type TaskFamily } from "@/lib/taskGroups";
 import {
   DAILY_CAPACITY,
@@ -88,12 +89,10 @@ export function Dashboard({
   const ownName = profile.workName.trim();
   const orgUnits = payload.org?.units ?? [];
   const orgMembers = payload.org?.members ?? [];
-  const divisionOptions = useMemo(() => {
-    const all = divisionsOf(orgUnits);
-    if (profile.role === "superAdmin") return all;
-    if (profile.divisionId) return all.filter((unit) => unit.id === profile.divisionId);
-    return all;
-  }, [orgUnits, profile.role, profile.divisionId]);
+  const divisionOptions = useMemo(
+    () => divisionsVisibleTo(profile, orgUnits),
+    [orgUnits, profile],
+  );
   const [divisionId, setDivisionId] = useState<string | null>(profile.divisionId || null);
   const [teamId, setTeamId] = useState<string | null>(
     profile.role === "lead" ? profile.teamId || null : null,
@@ -306,35 +305,20 @@ export function Dashboard({
         </div>
       </header>
 
-      {viewAll && divisionOptions.length > 0 ? (
-        <section className="chips" aria-label="조직 필터">
-          {profile.role === "superAdmin" || divisionOptions.length > 1 ? (
-            <button
-              className={`chip ${divisionId === null ? "on" : ""}`}
-              type="button"
-              onClick={() => {
-                setDivisionId(null);
-                setTeamId(null);
-              }}
-            >
-              전체 본부
-            </button>
-          ) : null}
-          {divisionOptions.map((unit) => (
-            <button
-              key={unit.id}
-              className={`chip ${divisionId === unit.id ? "on" : ""}`}
-              type="button"
-              onClick={() => {
-                setDivisionId(unit.id);
-                setTeamId(null);
-              }}
-            >
-              {unit.name}
-            </button>
-          ))}
+      {viewAll ? (
+        <>
+          <DivisionChips
+            profile={profile}
+            units={orgUnits}
+            divisionId={divisionId}
+            onChange={(id) => {
+              setDivisionId(id);
+              setTeamId(null);
+            }}
+          />
           {divisionId && teamOptions.length > 0 ? (
-            <>
+            <section className="chips" aria-label="팀 필터">
+              <span className="chip-group-label">팀</span>
               <button
                 className={`chip ${teamId === null ? "on" : ""}`}
                 type="button"
@@ -352,11 +336,12 @@ export function Dashboard({
                   {unit.name}
                 </button>
               ))}
-            </>
+            </section>
           ) : null}
-        </section>
-      ) : viewAll && divisionOptions.length === 0 ? (
-        <p className="hint">권한 화면에서 본부·팀을 만들면 조직별로 부하를 나눌 수 있습니다.</p>
+          {divisionOptions.length === 0 ? (
+            <p className="hint">권한 화면에서 본부를 만들면 일정승인과 같이 본부별로 부하를 볼 수 있습니다.</p>
+          ) : null}
+        </>
       ) : null}
 
       <section className="chips" aria-label="서비스 필터">

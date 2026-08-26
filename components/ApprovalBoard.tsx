@@ -26,7 +26,8 @@ import { TaskFamilyBody } from "@/components/TaskFamilyBody";
 import { Pager, PageSizeSelect } from "@/components/Pager";
 import { pageGroups } from "@/lib/pager";
 import { groupTasksByRoot, treeDepthOf } from "@/lib/taskGroups";
-import { divisionsOf, taskMatchesOrgNames, unitName, workNamesForSelection } from "@/lib/org";
+import { taskMatchesOrgNames, unitName, workNamesForSelection } from "@/lib/org";
+import { DivisionChips } from "@/components/DivisionChips";
 import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 function fmt(n: number, digits = 1): string {
@@ -90,12 +91,6 @@ export function ApprovalBoard({ token, profile }: { token: string; profile: Acce
   const viewAll = canViewAllLoad(profile);
   const orgUnits = payload?.org?.units ?? [];
   const orgMembers = payload?.org?.members ?? [];
-  const divisionOptions = useMemo(() => {
-    const all = divisionsOf(orgUnits);
-    if (profile.role === "superAdmin") return all;
-    if (profile.divisionId) return all.filter((unit) => unit.id === profile.divisionId);
-    return all;
-  }, [orgUnits, profile.role, profile.divisionId]);
   const orgNames = useMemo(
     () => workNamesForSelection(orgMembers, divisionId, null),
     [orgMembers, divisionId],
@@ -182,28 +177,13 @@ export function ApprovalBoard({ token, profile }: { token: string; profile: Acce
 
       {error ? <p className="auth-error">{error}</p> : null}
 
-      {viewAll && divisionOptions.length > 0 ? (
-        <section className="chips" aria-label="본부 필터">
-          {profile.role === "superAdmin" ? (
-            <button
-              className={`chip ${divisionId === null ? "on" : ""}`}
-              type="button"
-              onClick={() => setDivisionId(null)}
-            >
-              전체 본부
-            </button>
-          ) : null}
-          {divisionOptions.map((unit) => (
-            <button
-              key={unit.id}
-              className={`chip ${divisionId === unit.id ? "on" : ""}`}
-              type="button"
-              onClick={() => setDivisionId(unit.id)}
-            >
-              {unit.name}
-            </button>
-          ))}
-        </section>
+      {viewAll ? (
+        <DivisionChips
+          profile={profile}
+          units={orgUnits}
+          divisionId={divisionId}
+          onChange={setDivisionId}
+        />
       ) : null}
 
       <section className="chips" aria-label="서비스 필터">

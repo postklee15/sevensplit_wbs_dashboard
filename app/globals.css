@@ -759,6 +759,14 @@ table.tasks tbody.task-family tr.task-family-child.unassigned-task td {
   margin: 0 0 16px;
 }
 
+.chip-group-label {
+  align-self: center;
+  margin-right: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--muted);
+}
+
 .auth-page {
   max-width: 520px;
   margin: 96px auto;
