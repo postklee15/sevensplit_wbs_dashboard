@@ -1327,37 +1327,231 @@ table.tasks tbody.task-family tr.task-family-child.unassigned-task td {
 
 .org-tree {
   display: grid;
-  gap: 16px;
-  padding: 4px 16px 20px;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 12px;
+  padding: 0 16px 16px;
 }
 
 .org-division {
   border: 1px solid var(--line);
   background: var(--paper-2);
-  padding: 12px 14px;
+  padding: 12px;
 }
 
-.org-division-head,
-.org-teams li {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+.org-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 3.5rem max-content;
   gap: 8px;
+  align-items: center;
+}
+
+.org-row-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+}
+
+.org-division > .org-row .org-row-name {
+  font-size: 14px;
+}
+
+.org-row-count {
+  color: var(--muted);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.org-row-actions {
+  display: flex;
+  gap: 6px;
+  min-width: 7.25rem;
+}
+
+.org-row-spacer {
+  display: inline-block;
+  width: 52px;
 }
 
 .org-teams {
   list-style: none;
-  margin: 10px 0 0;
+  margin: 8px 0 0;
   padding: 0;
 }
 
 .org-teams li {
-  padding: 8px 0;
+  padding: 8px 0 0;
   border-top: 1px solid var(--line);
+  margin-top: 8px;
 }
 
-.org-division .controls {
-  padding-top: 10px;
+.org-teams-empty {
+  margin: 8px 0 0;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.org-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.panel > .org-add {
+  margin: 0 16px 12px;
+  max-width: 360px;
+}
+
+.shell.wide.access-page {
+  max-width: 1480px;
+}
+
+.access-page .top {
+  align-items: flex-start;
+}
+
+.access-page .panel {
+  min-height: 0;
+  margin-bottom: 16px;
+}
+
+.access-page .panel > .sub,
+.access-page .panel > ul.sub {
+  padding: 6px 16px 12px;
+  margin: 0;
+}
+
+.access-page .access-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  padding: 0 16px 16px;
+}
+
+.access-page .cell-input {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+
+.access-page .table-wrap {
+  max-height: min(70vh, 720px);
+  overflow: auto;
+}
+
+.access-table {
+  table-layout: fixed;
+  min-width: 1100px;
+}
+
+.access-table th,
+.access-table td {
+  vertical-align: middle;
+  padding: 8px 10px;
+}
+
+.access-table th {
+  white-space: nowrap;
+}
+
+.access-table col.col-email {
+  width: 16%;
+}
+
+.access-table col.col-name {
+  width: 9%;
+}
+
+.access-table col.col-work {
+  width: 12%;
+}
+
+.access-table col.col-role {
+  width: 8%;
+}
+
+.access-table col.col-org {
+  width: 10%;
+}
+
+.access-table col.col-slack {
+  width: 14%;
+}
+
+.access-table col.col-flag {
+  width: 6%;
+}
+
+.access-table col.col-seen {
+  width: 9%;
+}
+
+.access-table .cell-clip {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.access-table .col-flag {
+  text-align: center;
+}
+
+.access-table .col-flag .toggle {
+  justify-content: center;
+  white-space: nowrap;
+}
+
+.access-table .col-flag .toggle input {
+  width: auto;
+}
+
+.access-table .col-seen {
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+}
+
+.access-table .slack-id-cell {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+
+.access-table .slack-id-cell .cell-input {
+  width: 100%;
+}
+
+.cell-static {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  color: var(--muted);
+}
+
+.access-pm {
+  table-layout: fixed;
+}
+
+.access-pm col.col-service {
+  width: 28%;
+}
+
+.access-pm col.col-pm {
+  width: 72%;
+}
+
+.access-pm th,
+.access-pm td {
+  vertical-align: middle;
 }
 
 @media (max-width: 980px) {

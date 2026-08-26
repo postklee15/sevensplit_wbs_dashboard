@@ -41,7 +41,7 @@ export function OrgTreeAdmin({
         본부는 슈퍼관리자만 추가·삭제합니다. 본부장은 자기 본부 팀을 관리합니다.
       </p>
       {me.isSuperAdmin ? (
-        <div className="controls" style={{ justifyContent: "flex-start", padding: "0 16px 12px" }}>
+        <div className="org-add">
           <input
             className="cell-input"
             placeholder="본부 이름"
@@ -50,7 +50,7 @@ export function OrgTreeAdmin({
             disabled={busy !== null}
           />
           <button
-            className="btn"
+            className="btn compact"
             type="button"
             disabled={busy !== null || !newDivision.trim()}
             onClick={() => {
@@ -111,67 +111,49 @@ function DivisionBlock({
   const [teamName, setTeamName] = useState("");
   return (
     <section className="org-division">
-      <header className="org-division-head">
-        <strong>{division.name}</strong>
-        <span className="muted">{people}명</span>
-        <button
-          className="chip"
-          type="button"
-          disabled={busy !== null}
-          onClick={() => {
-            const next = window.prompt("본부 이름", division.name);
-            if (!next || next.trim() === division.name) return;
-            void onRename(division.id, next.trim());
-          }}
-        >
-          이름
-        </button>
-        {canDeleteDivision ? (
-          <button
-            className="chip"
-            type="button"
-            disabled={busy !== null}
-            onClick={() => {
-              if (!window.confirm(`본부 「${division.name}」와 하위 팀을 삭제할까요?`)) return;
-              void onDelete(division.id);
-            }}
-          >
-            삭제
-          </button>
-        ) : null}
-      </header>
-      <ul className="org-teams">
-        {teams.map((team) => (
-          <li key={team.id}>
-            <span>{team.name}</span>
-            <span className="muted">{countIn(division.id, team.id)}명</span>
-            <button
-              className="chip"
-              type="button"
-              disabled={busy !== null}
-              onClick={() => {
-                const next = window.prompt("팀 이름", team.name);
-                if (!next || next.trim() === team.name) return;
-                void onRename(team.id, next.trim());
-              }}
-            >
-              이름
-            </button>
-            <button
-              className="chip"
-              type="button"
-              disabled={busy !== null}
-              onClick={() => {
-                if (!window.confirm(`팀 「${team.name}」을 삭제할까요?`)) return;
-                void onDelete(team.id);
-              }}
-            >
-              삭제
-            </button>
-          </li>
-        ))}
-      </ul>
-      <div className="controls" style={{ justifyContent: "flex-start" }}>
+      <OrgRow
+        name={division.name}
+        count={people}
+        busy={busy}
+        onRename={() => {
+          const next = window.prompt("본부 이름", division.name);
+          if (!next || next.trim() === division.name) return;
+          void onRename(division.id, next.trim());
+        }}
+        onDelete={
+          canDeleteDivision
+            ? () => {
+                if (!window.confirm(`본부 「${division.name}」와 하위 팀을 삭제할까요?`)) return;
+                void onDelete(division.id);
+              }
+            : undefined
+        }
+      />
+      {teams.length > 0 ? (
+        <ul className="org-teams">
+          {teams.map((team) => (
+            <li key={team.id}>
+              <OrgRow
+                name={team.name}
+                count={countIn(division.id, team.id)}
+                busy={busy}
+                onRename={() => {
+                  const next = window.prompt("팀 이름", team.name);
+                  if (!next || next.trim() === team.name) return;
+                  void onRename(team.id, next.trim());
+                }}
+                onDelete={() => {
+                  if (!window.confirm(`팀 「${team.name}」을 삭제할까요?`)) return;
+                  void onDelete(team.id);
+                }}
+              />
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className="org-teams-empty">아직 팀이 없습니다.</p>
+      )}
+      <div className="org-add">
         <input
           className="cell-input"
           placeholder="팀 이름"
@@ -180,7 +162,7 @@ function DivisionBlock({
           disabled={busy !== null}
         />
         <button
-          className="btn"
+          className="btn compact"
           type="button"
           disabled={busy !== null || !teamName.trim()}
           onClick={() => {
@@ -193,5 +175,40 @@ function DivisionBlock({
         </button>
       </div>
     </section>
+  );
+}
+
+function OrgRow({
+  name,
+  count,
+  busy,
+  onRename,
+  onDelete,
+}: {
+  name: string;
+  count: number;
+  busy: string | null;
+  onRename: () => void;
+  onDelete?: () => void;
+}) {
+  return (
+    <div className="org-row">
+      <strong className="org-row-name" title={name}>
+        {name}
+      </strong>
+      <span className="org-row-count">{count}명</span>
+      <span className="org-row-actions">
+        <button className="chip" type="button" disabled={busy !== null} onClick={onRename}>
+          이름
+        </button>
+        {onDelete ? (
+          <button className="chip" type="button" disabled={busy !== null} onClick={onDelete}>
+            삭제
+          </button>
+        ) : (
+          <span className="org-row-spacer" aria-hidden="true" />
+        )}
+      </span>
+    </div>
   );
 }

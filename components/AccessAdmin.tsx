@@ -43,6 +43,23 @@ function userLabel(user: AccessProfile): string {
   return user.workName ? `${user.workName} (${user.email})` : user.email;
 }
 
+function formatLastSeen(iso: string | null): string {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("ko-KR", {
+    timeZone: "Asia/Seoul",
+    year: "2-digit",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  });
+}
+
+function CellStatic({ children }: { children: string }) {
+  return <span className="cell-static">{children}</span>;
+}
+
 export function AccessAdmin({ token, me }: { token: string; me: AccessProfile }) {
   const [users, setUsers] = useState<AccessProfile[]>([]);
   const [units, setUnits] = useState<OrgUnit[]>([]);
@@ -245,7 +262,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
   }
 
   return (
-    <main className="shell wide">
+    <main className="shell wide access-page">
       <header className="top">
         <div>
           <p className="kicker">Split Invest · 접근 권한</p>
@@ -280,7 +297,19 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
       <div className="panel">
         <h2>가입 계정 · {visibleUsers.length}명</h2>
         <div className="table-wrap">
-          <table className="tasks">
+          <table className="tasks access-table">
+            <colgroup>
+              <col className="col-email" />
+              <col className="col-name" />
+              <col className="col-work" />
+              <col className="col-role" />
+              <col className="col-org" />
+              <col className="col-org" />
+              <col className="col-slack" />
+              <col className="col-flag" />
+              <col className="col-flag" />
+              <col className="col-seen" />
+            </colgroup>
             <thead>
               <tr>
                 <th>이메일</th>
@@ -289,17 +318,21 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                 <th>역할</th>
                 <th>본부</th>
                 <th>팀</th>
-                <th>Slack 멤버 ID</th>
-                <th>부하 대시보드</th>
-                <th>성과 페이지</th>
-                <th>최근 로그인</th>
+                <th>Slack</th>
+                <th title="부하 대시보드">부하</th>
+                <th title="성과 페이지">성과</th>
+                <th title="최근 로그인">로그인</th>
               </tr>
             </thead>
             <tbody>
               {visibleUsers.map((user) => (
                 <tr key={user.uid}>
-                  <td>{user.email}</td>
-                  <td>{user.displayName || "—"}</td>
+                  <td className="cell-clip" title={user.email}>
+                    {user.email}
+                  </td>
+                  <td className="cell-clip" title={user.displayName || undefined}>
+                    {user.displayName || <CellStatic>—</CellStatic>}
+                  </td>
                   <td>
                     <input
                       key={`${user.uid}:work:${user.workName}`}
@@ -316,9 +349,9 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                   </td>
                   <td>
                     {user.isSuperAdmin ? (
-                      ROLE_LABEL.superAdmin
+                      <CellStatic>{ROLE_LABEL.superAdmin}</CellStatic>
                     ) : user.role === "director" && !canAssignRole(me, "director") ? (
-                      ROLE_LABEL.director
+                      <CellStatic>{ROLE_LABEL.director}</CellStatic>
                     ) : (
                       <select
                         className="cell-input"
@@ -342,7 +375,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                   </td>
                   <td>
                     {user.isSuperAdmin ? (
-                      "—"
+                      <CellStatic>—</CellStatic>
                     ) : (
                       <select
                         className="cell-input"
@@ -368,7 +401,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                   </td>
                   <td>
                     {user.isSuperAdmin || user.role === "director" ? (
-                      "—"
+                      <CellStatic>—</CellStatic>
                     ) : (
                       <select
                         className="cell-input"
@@ -402,14 +435,15 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       <button
                         className="btn compact"
                         type="button"
+                        title="로그인 이메일로 Slack 멤버 ID 찾기"
                         disabled={busy !== null}
                         onClick={() => void save(user, { slackMemberId: user.email })}
                       >
-                        이메일로 찾기
+                        찾기
                       </button>
                     </div>
                   </td>
-                  <td>
+                  <td className="col-flag">
                     <label className="toggle">
                       <input
                         type="checkbox"
@@ -425,7 +459,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       허용
                     </label>
                   </td>
-                  <td>
+                  <td className="col-flag">
                     <label className="toggle">
                       <input
                         type="checkbox"
@@ -436,10 +470,8 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       허용
                     </label>
                   </td>
-                  <td>
-                    {user.lastSeenAt
-                      ? new Date(user.lastSeenAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
-                      : "—"}
+                  <td className="col-seen">
+                    <CellStatic>{formatLastSeen(user.lastSeenAt)}</CellStatic>
                   </td>
                 </tr>
               ))}
@@ -453,7 +485,11 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
         <h2>서비스 PM</h2>
         <p className="sub">미지정·일정 없는 리프 작업은 해당 서비스 PM에게 Slack DM으로 갑니다.</p>
         <div className="table-wrap">
-          <table className="tasks">
+          <table className="tasks access-pm">
+            <colgroup>
+              <col className="col-service" />
+              <col className="col-pm" />
+            </colgroup>
             <thead>
               <tr>
                 <th>서비스</th>
@@ -463,7 +499,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
             <tbody>
               {services.map((service) => (
                 <tr key={service}>
-                  <td>{service}</td>
+                  <td className="cell-clip">{service}</td>
                   <td>
                     <select
                       className="cell-input"
@@ -490,7 +526,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
       <div className="panel">
         <h2>Slack 알림</h2>
         <p className="sub">평일 09:00 KST에 GitHub Actions가 자동 발송합니다. 여기서 미리보기하거나 지금 보낼 수 있습니다.</p>
-        <div className="controls">
+        <div className="access-actions">
           <label className="toggle">
             <input type="checkbox" checked={force} onChange={(e) => setForce(e.target.checked)} />
             오늘 이미 보낸 것도 다시
