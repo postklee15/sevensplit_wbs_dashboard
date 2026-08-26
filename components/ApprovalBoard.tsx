@@ -10,6 +10,7 @@ import {
   STATUS_SORT,
   taskStatus,
   todayKst,
+  type TaskScope,
 } from "@/lib/metrics";
 import {
   SCHEDULE_APPROVALS,
@@ -18,6 +19,7 @@ import {
   type ScheduleApproval,
 } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
+import { TaskScopeChips } from "@/components/TaskScopeChips";
 import { Pager, PageSizeSelect } from "@/components/Pager";
 import { pageSlice } from "@/lib/pager";
 import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
@@ -46,7 +48,7 @@ export function ApprovalBoard({ token }: { token: string }) {
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [leafOnly, setLeafOnly] = useState(true);
+  const [taskScope, setTaskScope] = useState<TaskScope>("leaf");
   const [hideDone, setHideDone] = useState(true);
   const [service, setService] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -82,7 +84,7 @@ export function ApprovalBoard({ token }: { token: string }) {
   const scoped = useMemo(() => {
     if (!payload) return [];
     return filterTasks(payload.tasks, {
-      leafOnly,
+      taskScope,
       service,
       person: null,
       hideDone,
@@ -93,7 +95,7 @@ export function ApprovalBoard({ token }: { token: string }) {
       if (d !== 0) return d;
       return (a.start ?? "9999").localeCompare(b.start ?? "9999");
     });
-  }, [payload, leafOnly, service, hideDone, query, today]);
+  }, [payload, taskScope, service, hideDone, query, today]);
 
   const counts = useMemo(() => countByScheduleApproval(scoped), [scoped]);
   const services = useMemo(() => (payload ? servicesOf(payload.tasks) : []), [payload]);
@@ -108,7 +110,7 @@ export function ApprovalBoard({ token }: { token: string }) {
 
   useEffect(() => {
     setPageByKey({});
-  }, [leafOnly, hideDone, service, query, approval, pageSize]);
+  }, [taskScope, hideDone, service, query, approval, pageSize]);
 
   const fetched = payload
     ? new Date(payload.fetchedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
@@ -131,13 +133,7 @@ export function ApprovalBoard({ token }: { token: string }) {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button
-            className={`chip ${leafOnly ? "on" : ""}`}
-            type="button"
-            onClick={() => setLeafOnly((v) => !v)}
-          >
-            하위 작업만
-          </button>
+          <TaskScopeChips value={taskScope} onChange={setTaskScope} />
           <button
             className={`chip ${hideDone ? "on" : ""}`}
             type="button"

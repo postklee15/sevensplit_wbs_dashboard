@@ -1,4 +1,19 @@
 import type { PersonRow, Task, TaskStatus } from "./types";
+import { isRootTask } from "./taskTree";
+
+export type TaskScope = "leaf" | "root" | "all";
+
+export const TASK_SCOPE_OPTIONS: { value: TaskScope; label: string }[] = [
+  { value: "leaf", label: "하위 작업만" },
+  { value: "root", label: "최상위만" },
+  { value: "all", label: "전체" },
+];
+
+export function resolveTaskScope(opts: { taskScope?: TaskScope; leafOnly?: boolean }): TaskScope {
+  if (opts.taskScope) return opts.taskScope;
+  if (opts.leafOnly === false) return "all";
+  return "leaf";
+}
 
 export const WEEK_COUNT = 8;
 export const WEEKLY_CAPACITY = 5;
@@ -175,7 +190,8 @@ export function overdueBucketDay(today: string, week0Monday: string): string {
 export function filterTasks(
   tasks: Task[],
   opts: {
-    leafOnly: boolean;
+    leafOnly?: boolean;
+    taskScope?: TaskScope;
     service: string | null;
     person: string | null;
     hideDone: boolean;
@@ -184,8 +200,10 @@ export function filterTasks(
   },
 ): Task[] {
   const q = opts.query.trim().toLowerCase();
+  const scope = resolveTaskScope(opts);
   return tasks.filter((task) => {
-    if (opts.leafOnly && !task.isLeaf) return false;
+    if (scope === "leaf" && !task.isLeaf) return false;
+    if (scope === "root" && !isRootTask(task)) return false;
     if (opts.service && task.service !== opts.service) return false;
     if (opts.hideDone && taskStatus(task, opts.today) === "완료") return false;
     if (opts.person) {

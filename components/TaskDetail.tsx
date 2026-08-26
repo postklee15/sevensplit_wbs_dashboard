@@ -23,6 +23,7 @@ import {
 } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 import { isRootTask } from "@/lib/taskTree";
+import { RootBadge } from "@/components/RootBadge";
 import type { Task, TaskPatch, TaskWriteBody, WbsFieldKey, WbsFieldSchema, WbsSchema } from "@/lib/types";
 import { emitWbsDataRefresh } from "@/lib/wbsRefresh";
 
@@ -531,7 +532,7 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
       <button className="task-detail-backdrop" type="button" aria-label="닫기" onClick={onClose} />
       <aside className="task-detail-panel" role="dialog" aria-modal="true" aria-labelledby="task-detail-title">
         <header className="task-detail-head">
-          <p className="kicker">업무 상세</p>
+          <p className="kicker">{isRootTask(task) ? "최상위 작업 · 업무 상세" : "업무 상세"}</p>
           <div className="task-detail-actions">
             {task.url ? (
               <a className="chip" href={task.url} target="_blank" rel="noopener noreferrer">
@@ -558,6 +559,7 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
               <h2 id="task-detail-title">{task.title}</h2>
             )}
             <div className="task-detail-badges">
+              {isRootTask(task) ? <RootBadge /> : null}
               <span className={`badge ${status}`}>{status}</span>
               <span className={`badge ap-${scheduleApprovalOf(previewTask)}`}>
                 {scheduleApprovalOf(previewTask)}
@@ -861,6 +863,7 @@ function TaskDetailRead({
     <>
       <h2 id="task-detail-title">{task.title}</h2>
       <div className="task-detail-badges">
+        {isRootTask(task) ? <RootBadge /> : null}
         <span className={`badge ${status}`}>{status}</span>
         {hasField(view, "scheduleApproval") || task.scheduleApproval != null ? (
           <span className={`badge ap-${scheduleApprovalOf(task)}`}>{scheduleApprovalOf(task)}</span>

@@ -681,6 +681,27 @@ table.tasks {
   margin-bottom: 2px;
 }
 
+.root-badge {
+  display: inline-block;
+  margin: 0 6px 0 0;
+  padding: 1px 7px;
+  border-radius: 999px;
+  border: 1px solid #e8c4b4;
+  background: #f8e8e0;
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0;
+  text-transform: none;
+  vertical-align: 1px;
+  line-height: 1.4;
+}
+
+.kicker .root-badge,
+.task-detail-badges .root-badge {
+  margin-right: 0;
+}
+
 .issue {
   color: var(--muted);
   font-size: 12px;

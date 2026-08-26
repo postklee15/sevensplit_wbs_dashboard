@@ -13,9 +13,11 @@ import {
   STATUS_SORT,
   taskStatus,
   todayKst,
+  type TaskScope,
 } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
+import { TaskScopeChips } from "@/components/TaskScopeChips";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
@@ -175,7 +177,7 @@ export function MyWorkBoard({
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(Boolean(workName));
-  const [leafOnly, setLeafOnly] = useState(true);
+  const [taskScope, setTaskScope] = useState<TaskScope>("leaf");
   const [hideDone, setHideDone] = useState(true);
   const [service, setService] = useState<string | null>(null);
   const [query, setQuery] = useState("");
@@ -210,7 +212,7 @@ export function MyWorkBoard({
   const mine = useMemo(() => {
     if (!payload || !workName) return [];
     return filterTasks(payload.tasks, {
-      leafOnly,
+      taskScope,
       service,
       person: workName,
       hideDone,
@@ -221,7 +223,7 @@ export function MyWorkBoard({
       if (d !== 0) return d;
       return (a.start ?? "9999").localeCompare(b.start ?? "9999");
     });
-  }, [payload, workName, leafOnly, service, hideDone, query, today]);
+  }, [payload, workName, taskScope, service, hideDone, query, today]);
 
   const services = useMemo(() => (payload ? servicesOf(payload.tasks) : []), [payload]);
   const open = mine.filter((task) => taskStatus(task, today) !== "완료").length;
@@ -290,13 +292,7 @@ export function MyWorkBoard({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button
-            className={`chip ${leafOnly ? "on" : ""}`}
-            type="button"
-            onClick={() => setLeafOnly((v) => !v)}
-          >
-            하위 작업만
-          </button>
+          <TaskScopeChips value={taskScope} onChange={setTaskScope} />
           <button
             className={`chip ${hideDone ? "on" : ""}`}
             type="button"

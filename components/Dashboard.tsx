@@ -8,6 +8,7 @@ import { canViewAllLoad } from "@/lib/acl";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { TaskTitle } from "@/components/TaskTitle";
+import { TaskScopeChips } from "@/components/TaskScopeChips";
 import {
   DAILY_CAPACITY,
   NO_SERVICE,
@@ -30,6 +31,7 @@ import {
   unassignedServiceOf,
   weekStarts,
   weekdaysOf,
+  type TaskScope,
 } from "@/lib/metrics";
 
 type ViewMode = "load" | "month" | "week";
@@ -81,7 +83,7 @@ export function Dashboard({
   const weeks = useMemo(() => weekStarts(today), [today]);
   const viewAll = canViewAllLoad(profile);
   const ownName = profile.workName.trim();
-  const [leafOnly, setLeafOnly] = useState(true);
+  const [taskScope, setTaskScope] = useState<TaskScope>("leaf");
   const [hideDone, setHideDone] = useState(true);
   const [service, setService] = useState<string | null>(null);
   const [person, setPerson] = useState<string | null>(null);
@@ -106,14 +108,14 @@ export function Dashboard({
   const scoped = useMemo(() => {
     if (!viewAll && !ownName) return [];
     return filterTasks(payload.tasks, {
-      leafOnly,
+      taskScope: taskScope === "all" ? "all" : "leaf",
       service,
       person: viewAll ? null : ownName,
       hideDone: false,
       query: "",
       today,
     });
-  }, [payload.tasks, leafOnly, service, today, viewAll, ownName]);
+  }, [payload.tasks, taskScope, service, today, viewAll, ownName]);
 
   const rows = useMemo(() => {
     const built = buildPersonRows(scoped, today, weeks);
@@ -157,7 +159,7 @@ export function Dashboard({
   const visibleTasks = useMemo(
     () =>
       filterTasks(payload.tasks, {
-        leafOnly,
+        taskScope,
         service,
         person,
         hideDone,
@@ -168,7 +170,7 @@ export function Dashboard({
         if (d !== 0) return d;
         return (a.start ?? "9999").localeCompare(b.start ?? "9999");
       }),
-    [payload.tasks, leafOnly, service, person, hideDone, query, today],
+    [payload.tasks, taskScope, service, person, hideDone, query, today],
   );
   const assignedTasks = useMemo(
     () => visibleTasks.filter((task) => task.assignees.length > 0),
@@ -182,7 +184,7 @@ export function Dashboard({
   useEffect(() => {
     setUnassignedPage(1);
     setAssignedPage(1);
-  }, [leafOnly, hideDone, service, person, query, pageSize]);
+  }, [taskScope, hideDone, service, person, query, pageSize]);
 
   const pagedUnassigned = useMemo(
     () => pageSlice(unassignedTasks, unassignedPage, pageSize),
@@ -205,7 +207,7 @@ export function Dashboard({
           <h1>{viewAll ? "담당자별 리소스 현황" : `내 부하 · ${ownName || "이름 없음"}`}</h1>
       <p className="sub">
             {viewAll
-              ? `하위 작업 공수 기준 · 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
+              ? `${taskScope === "all" ? "상위·하위 포함 공수" : "하위 작업 공수 기준"} · 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
               : ownName
                 ? `팀원은 본인 담당 작업만 봅니다. 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
                 : "프로필에 노션 담당자 이름을 저장해야 내 부하를 표시합니다."}
@@ -240,13 +242,7 @@ export function Dashboard({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
-          <button
-            className={`chip ${leafOnly ? "on" : ""}`}
-            onClick={() => setLeafOnly((v) => !v)}
-            type="button"
-          >
-            하위 작업만
-          </button>
+          <TaskScopeChips value={taskScope} onChange={setTaskScope} />
           <button
             className={`chip ${hideDone ? "on" : ""}`}
             onClick={() => setHideDone((v) => !v)}
@@ -321,14 +317,21 @@ export function Dashboard({
       ) : null}
 
       {view !== "load" ? (
-        <WbsCalendar
-          tasks={visibleTasks}
-          today={today}
-          mode={view}
-          person={person}
-          onSelectPerson={viewAll ? (name) => pickPerson(person === name ? null : name) : undefined}
-          lockPerson={!viewAll}
-        />
+        <>
+          {taskScope === "root" ? (
+            <p className="hint" style={{ marginBottom: 12 }}>
+              달력은 최상위 작업만 보여 줍니다. 부하 숫자는 하위 작업 기준입니다.
+            </p>
+          ) : null}
+          <WbsCalendar
+            tasks={visibleTasks}
+            today={today}
+            mode={view}
+            person={person}
+            onSelectPerson={viewAll ? (name) => pickPerson(person === name ? null : name) : undefined}
+            lockPerson={!viewAll}
+          />
+        </>
       ) : null}
 
       {view === "load" ? (
@@ -480,6 +483,11 @@ export function Dashboard({
               <PageSizeSelect value={pageSize} onChange={setPageSize} />
             ) : null}
           </div>
+          {taskScope === "root" ? (
+            <p className="hint" style={{ padding: "8px 16px 0" }}>
+              목록과 달력은 최상위 작업만 보여 줍니다. 부하 숫자는 하위 작업 기준입니다.
+            </p>
+          ) : null}
           {person && viewAll ? (
             <p className="hint" style={{ padding: "8px 16px 0" }}>
               <button className="chip" type="button" onClick={() => pickPerson(null)}>
