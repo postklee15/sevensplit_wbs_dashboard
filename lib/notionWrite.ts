@@ -444,6 +444,7 @@ export async function patchWbsPage(
   return {
     ...next,
     ancestorTitles: current.ancestorTitles,
+    parentId: current.parentId,
     service: next.ownService || current.service,
   };
 }

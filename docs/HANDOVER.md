@@ -114,11 +114,12 @@ npm run dev   # next dev --turbopack
 | `components/WbsApp.tsx` | `/api/wbs` 호출, 세션 쿠키 |
 | `components/Dashboard.tsx` | 부하 뷰 + 보기 전환 |
 | `components/WbsCalendar.tsx` | 월력/주력 |
-| `components/TaskDetail.tsx` | 업무 상세. 권한 있으면 폼+저장, 없으면 읽기. 「노션에서 열기」 |
+| `components/TaskDetail.tsx` | 업무 상세. 권한 있으면 폼+저장. 최상위 지연은 하위 일괄 적용 체크 |
 | `app/api/wbs/route.ts` | 인증 후 노션 fetch |
 | `app/api/wbs/schema/route.ts` | DB 스키마·사람 목록 |
-| `app/api/wbs/[id]/route.ts` | 페이지 GET·PATCH. 우리 DB만 |
+| `app/api/wbs/[id]/route.ts` | 페이지 GET·PATCH. `cascadeDelay`면 하위 지연 복사 |
 | `lib/notionWrite.ts` | 스키마 파싱·속성 쓰기 |
+| `lib/wbsDelayCascade.ts` | 최상위 → 하위 지연 일괄 |
 | `lib/adminAuth.ts` | ID 토큰 검증 (`jose`, 이름은 admin이지만 firebase-admin 없음) |
 | `lib/sessionCookie.ts` | `wbs_token` 쿠키. 예전 `__session`은 지움 |
 | `lib/firebase.ts` | 클라이언트 Firebase 앱 |
@@ -274,6 +275,7 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 5. 캘린더/부하 필터는 클라이언트만. `/api/wbs`는 팀장·슈퍼관리자에게 DB 통째, 팀원에게는 본인 담당만.
 6. 용량 5인일·평일만 배분·주말 제외는 제품 가정입니다. 바꾸려면 `WEEKLY_CAPACITY`와 `buildPersonRows`를 보면 됩니다.
 7. 업무 상세 저장은 `PATCH /api/wbs/[id]`. 팀장·슈퍼관리자 전체, 팀원은 `workName`이 담당자와 완전 일치할 때만. 인테그레이션에 DB 편집 권한이 필요하다.
+8. 최상위 작업을 지연으로 저장할 때 팀장·슈퍼관리자는 `cascadeDelay`로 하위 전체에 추가 일정·지연사유·일정승인(지연)을 복사한다. 하위가 많으면 일부만 적용될 수 있어 다시 저장한다.
 
 ---
 
@@ -291,7 +293,7 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 ## 12. 다음 에이전트에게 추천하는 첫 작업
 
 1. GitHub Actions `Deploy` 워크플로가 이 푸시에서 초록인지 확인.
-2. 라이브에서 `@sevensplit.com` 로그인 → 대시보드 로드 → 업무 상세에서 저장(팀장 전체, 팀원은 본인만).
+2. 라이브에서 `@sevensplit.com` 로그인 → 대시보드 로드 → 업무 상세에서 저장(팀장 전체, 팀원은 본인만). 팀장으로 최상위 지연 일괄도 확인.
 3. 저장이 502면 노션 인테그레이션의 DB 편집 권한을 확인.
 4. 필요하면 favicon, next.config 경고, 부하 가정(주 5인일) 조정을 이어가면 됨.
 

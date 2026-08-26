@@ -11,7 +11,7 @@ import {
   type ReactNode,
 } from "react";
 import type { AccessProfile } from "@/lib/acl";
-import { canEditWbsTask } from "@/lib/acl";
+import { canCascadeWbsDelay, canEditWbsTask } from "@/lib/acl";
 import {
   UNASSIGNED,
   effectiveEnd,
@@ -22,7 +22,8 @@ import {
   todayKst,
 } from "@/lib/metrics";
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
-import type { Task, TaskPatch, WbsFieldKey, WbsFieldSchema, WbsSchema } from "@/lib/types";
+import { isRootTask } from "@/lib/taskTree";
+import type { Task, TaskPatch, TaskWriteBody, WbsFieldKey, WbsFieldSchema, WbsSchema } from "@/lib/types";
 import { emitWbsDataRefresh } from "@/lib/wbsRefresh";
 
 export type TaskView = Pick<Task, "id" | "title"> & Partial<Omit<Task, "id" | "title">>;
@@ -68,6 +69,7 @@ function toTask(view: TaskView): Task {
     issue: view.issue ?? "",
     delayReason: view.delayReason ?? null,
     isLeaf: view.isLeaf ?? true,
+    parentId: view.parentId ?? null,
   };
 }
 
@@ -386,6 +388,8 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [cascadeDelay, setCascadeDelay] = useState(true);
+  const [cascadeNote, setCascadeNote] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -395,6 +399,7 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
     setDraft(null);
     setSaved(false);
     setSaveError(null);
+    setCascadeNote(null);
     (async () => {
       try {
         const res = await fetch(`/api/wbs/${encodeURIComponent(view.id)}`, {
@@ -413,6 +418,7 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
           ancestorTitles: body.task.ancestorTitles.length
             ? body.task.ancestorTitles
             : (view.ancestorTitles ?? []),
+          parentId: body.task.parentId ?? view.parentId ?? null,
           service: body.task.ownService || body.task.service || view.service || null,
           url: body.task.url || view.url || "",
         };
@@ -433,6 +439,7 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
 
   const task = hydrated ?? toTask(view);
   const canEdit = canEditWbsTask(profile, task.assignees) && Boolean(hydrated) && Boolean(schema);
+  const canCascade = canEdit && canCascadeWbsDelay(profile) && isRootTask(task);
   const today = todayKst();
   const path = task.ancestorTitles.filter(Boolean);
   const people = useMemo(() => {
@@ -449,6 +456,8 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
         start: draft.start.trim() || null,
         end: draft.end.trim() || draft.start.trim() || null,
         extraDays: draft.extraDays.trim() ? Number(draft.extraDays) : null,
+        scheduleApproval: draft.scheduleApproval.trim() || null,
+        delayReason: draft.delayReason,
         progress: draft.progress.trim() ? Number(draft.progress) : null,
         allocation: draft.allocation.trim() ? Number(draft.allocation) : null,
       }
@@ -464,9 +473,11 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
     setSaving(true);
     setSaveError(null);
     setSaved(false);
+    setCascadeNote(null);
     try {
-      const patch = patchFromDraft(draft, schema);
+      const patch: TaskWriteBody = patchFromDraft(draft, schema);
       if (people.length === 0) delete patch.assigneeIds;
+      if (canCascade) patch.cascadeDelay = cascadeDelay;
       const res = await fetch(`/api/wbs/${encodeURIComponent(view.id)}`, {
         method: "PATCH",
         headers: {
@@ -476,7 +487,12 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
         credentials: "include",
         body: JSON.stringify(patch),
       });
-      const body = (await res.json()) as { task?: Task; error?: string };
+      const body = (await res.json()) as {
+        task?: Task;
+        cascaded?: number;
+        cascadeFailed?: number;
+        error?: string;
+      };
       if (!res.ok || !body.task) {
         throw new Error(body.error || `저장 실패 (${res.status})`);
       }
@@ -484,12 +500,24 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
         ...hydrated,
         ...body.task,
         ancestorTitles: hydrated.ancestorTitles,
+        parentId: body.task.parentId ?? hydrated.parentId,
         service: body.task.ownService || body.task.service || hydrated.service,
         url: body.task.url || hydrated.url,
       };
       setHydrated(next);
       setDraft(draftFromTask(next));
       setSaved(true);
+      if (canCascade && cascadeDelay) {
+        const ok = body.cascaded ?? 0;
+        const failed = body.cascadeFailed ?? 0;
+        if (failed > 0) {
+          setCascadeNote(`하위 ${ok}개에 지연을 적용했고, ${failed}개는 실패했습니다.`);
+        } else if (ok > 0) {
+          setCascadeNote(`하위 ${ok}개에도 같은 추가 일정·지연사유를 적용했습니다.`);
+        } else {
+          setCascadeNote("하위 작업이 없거나, 적용할 지연 값이 없어 이 작업만 저장했습니다.");
+        }
+      }
       emitWbsDataRefresh();
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : "저장하지 못했습니다.");
@@ -742,6 +770,18 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
                 <p>{task.delayReason?.trim() || "적힌 내용이 없습니다."}</p>
               )}
             </section>
+            {canCascade ? (
+              <label className="task-detail-cascade">
+                <input
+                  type="checkbox"
+                  checked={cascadeDelay}
+                  onChange={(event) => setCascadeDelay(event.target.checked)}
+                />
+                <span>
+                  하위 작업에도 같은 추가 일정·지연사유를 일괄 적용합니다. 일정승인이 「지연」이면 하위도 「지연」으로 맞춥니다.
+                </span>
+              </label>
+            ) : null}
             <section className="task-detail-issue">
               <h3>내용 / 이슈</h3>
               {isWritable(schema, "issue") && fieldOf(schema, "issue") ? (
@@ -757,13 +797,17 @@ function TaskDetailPanel({ view, onClose }: { view: TaskView; onClose: () => voi
             </section>
             {saveError ? <p className="auth-error">{saveError}</p> : null}
             {saved ? <p className="task-detail-ok">노션에 저장했습니다.</p> : null}
+            {cascadeNote ? <p className="task-detail-ok">{cascadeNote}</p> : null}
             <div className="task-detail-save-row">
               <button className="btn" type="submit" disabled={saving || loading}>
-                {saving ? "저장 중" : "노션에 저장"}
+                {saving ? (canCascade && cascadeDelay ? "저장 중 (하위 포함)" : "저장 중") : "노션에 저장"}
               </button>
             </div>
             <p className="task-detail-note muted">
               저장하면 노션 속성이 바뀝니다. 상태·잔여·연장 종료는 일정과 진척으로 계산되며 직접 고치지 않습니다.
+              {canCascade
+                ? " 최상위 작업의 하위 일괄 지연은 팀장·슈퍼관리자만 사용할 수 있습니다."
+                : ""}
             </p>
           </form>
         ) : (

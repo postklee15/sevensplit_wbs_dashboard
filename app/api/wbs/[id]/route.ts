@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
-import { canEditWbsTask, canOpenPage, canReadWbsTask } from "@/lib/acl";
+import { canCascadeWbsDelay, canEditWbsTask, canOpenPage, canReadWbsTask } from "@/lib/acl";
 import { jsonAuthError, requireSevensplitUser } from "@/lib/adminAuth";
 import { heartbeatUser } from "@/lib/aclStore";
-import { fetchWbsPage } from "@/lib/notion";
+import { fetchWbsPage, fetchWbsTasks } from "@/lib/notion";
+import { normalizeNotionId } from "@/lib/notionIds";
 import { fetchWbsSchema, PatchError, patchWbsPage } from "@/lib/notionWrite";
-import type { TaskPatch } from "@/lib/types";
+import { assertCanCascadeDelay, cascadeDelayToDescendants, rootLooksDelayed } from "@/lib/wbsDelayCascade";
+import type { TaskWriteBody } from "@/lib/types";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -56,15 +58,18 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
   const loaded = await loadProfile(request);
   if ("error" in loaded) return loaded.error;
 
-  let patch: TaskPatch;
+  let body: TaskWriteBody;
   try {
-    patch = (await request.json()) as TaskPatch;
-    if (!patch || typeof patch !== "object" || Array.isArray(patch)) {
+    body = (await request.json()) as TaskWriteBody;
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
       return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
     }
   } catch {
     return NextResponse.json({ error: "요청 본문이 올바르지 않습니다." }, { status: 400 });
   }
+
+  const cascadeDelay = Boolean(body.cascadeDelay);
+  const { cascadeDelay: _cascadeDelay, ...patch } = body;
 
   try {
     const { id } = await ctx.params;
@@ -78,9 +83,33 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
         { status: 403 },
       );
     }
+    if (cascadeDelay && !canCascadeWbsDelay(loaded.profile)) {
+      return NextResponse.json(
+        { error: "하위 일괄 지연은 팀장·슈퍼관리자만 할 수 있습니다." },
+        { status: 403 },
+      );
+    }
     const schema = await fetchWbsSchema(task.assigneePeople);
     const next = await patchWbsPage(id, patch, schema, task);
-    return NextResponse.json({ task: next });
+    let cascaded = 0;
+    let cascadeFailed = 0;
+    if (cascadeDelay && rootLooksDelayed(next)) {
+      const { tasks } = await fetchWbsTasks();
+      assertCanCascadeDelay(id, tasks);
+      const treeRoot = tasks.find((row) => normalizeNotionId(row.id) === normalizeNotionId(id));
+      const result = await cascadeDelayToDescendants({
+        rootId: id,
+        root: {
+          ...next,
+          parentId: treeRoot?.parentId ?? next.parentId,
+        },
+        tasks,
+        schema,
+      });
+      cascaded = result.cascaded;
+      cascadeFailed = result.cascadeFailed;
+    }
+    return NextResponse.json({ task: next, cascaded, cascadeFailed });
   } catch (error) {
     if (error instanceof PatchError) {
       return NextResponse.json({ error: error.message }, { status: error.status });

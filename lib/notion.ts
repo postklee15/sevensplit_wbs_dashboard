@@ -1,4 +1,7 @@
 import type { AssigneePerson, Task } from "./types";
+import { isNotionPageId, normalizeNotionId } from "./notionIds";
+
+export { isNotionPageId, normalizeNotionId } from "./notionIds";
 
 type NotionRichText = { plain_text?: string };
 type NotionPerson = { id?: string; name?: string };
@@ -38,19 +41,11 @@ export function getNotionConfig(): {
   };
 }
 
-export function normalizeNotionId(id: string): string {
-  return id.replace(/-/g, "").toLowerCase();
-}
-
 export function isWbsDatabaseId(id: string | null | undefined): boolean {
   if (!id) return false;
   const databaseId = process.env.NOTION_DATABASE_ID;
   if (!databaseId) return false;
   return normalizeNotionId(id) === normalizeNotionId(databaseId);
-}
-
-export function isNotionPageId(id: string): boolean {
-  return /^[0-9a-f]{32}$/i.test(normalizeNotionId(id));
 }
 
 type NotionProperty = {
@@ -180,6 +175,7 @@ export function parseTask(page: NotionPage): ParsedTask | null {
     issue: plain(props["내용/이슈"]?.rich_text),
     delayReason: attributeValue(pickProp(props, ["지연사유", "지연 사유"])),
     isLeaf: childIds.length === 0,
+    parentId: parentIds[0] ?? null,
     childIds,
     parentIds,
   };
@@ -235,6 +231,7 @@ function withTreeFields(tasks: ParsedTask[]): Task[] {
 
   return tasks.map(({ childIds: _childIds, parentIds: _parentIds, ...task }) => ({
     ...task,
+    parentId: parentOf.get(task.id) ?? null,
     ancestorTitles: ancestorTitlesOf(task.id),
     ownService: ownService(task),
     service: inheritedServiceOf(task.id),
@@ -385,6 +382,7 @@ export async function fetchWbsPage(pageId: string): Promise<{
   return {
     task: {
       ...task,
+      parentId: task.parentId,
       ownService: task.ownService ?? task.service,
     },
     inDatabase: page.parent?.type === "database_id" && isWbsDatabaseId(page.parent.database_id),

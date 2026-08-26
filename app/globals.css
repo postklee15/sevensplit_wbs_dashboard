@@ -1238,6 +1238,20 @@ table.tasks {
   margin-top: 16px;
 }
 
+.task-detail-cascade {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin: 16px 0 4px;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.task-detail-cascade input {
+  width: auto;
+  margin-top: 3px;
+}
+
 @media (max-width: 980px) {
   .task-detail-panel {
     width: 100%;

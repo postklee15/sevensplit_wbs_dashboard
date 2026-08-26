@@ -68,6 +68,11 @@ export function canEditWbsTask(profile: AccessProfile, assignees: string[]): boo
   return assignees.some((name) => name === workName);
 }
 
+/** 슈퍼관리자·팀장만 최상위 지연을 하위에 일괄 적용. */
+export function canCascadeWbsDelay(profile: AccessProfile): boolean {
+  return canViewAllLoad(profile);
+}
+
 /** 상세 조회. 팀장은 전체, 팀원은 본인 담당. 성과 권한이면 완료 목록 상세를 위해 허용. */
 export function canReadWbsTask(profile: AccessProfile, assignees: string[]): boolean {
   const resolved = applySuperAdmin(profile);

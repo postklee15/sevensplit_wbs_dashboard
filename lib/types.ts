@@ -30,6 +30,8 @@ export type Task = {
   issue: string;
   delayReason: string | null;
   isLeaf: boolean;
+  /** 트리 부모. 없으면 최상위. */
+  parentId: string | null;
 };
 
 export type WbsFieldKey =
@@ -87,6 +89,11 @@ export type TaskPatch = {
   effortDays?: number | null;
   delayReason?: string | null;
   issue?: string | null;
+};
+
+export type TaskWriteBody = TaskPatch & {
+  /** 최상위 지연 저장 시 하위에도 추가 일정·지연사유·일정승인(지연)을 복사 */
+  cascadeDelay?: boolean;
 };
 
 export type TaskStatus = "완료" | "진행중" | "예정" | "기한초과" | "기한연장" | "일정없음";
