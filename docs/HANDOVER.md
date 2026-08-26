@@ -112,7 +112,8 @@ npm run dev   # next dev --turbopack
 | `app/api/me/route.ts` | `POST` 하트비트, `PATCH` `workName` |
 | `components/AuthGate.tsx` | Google 로그인 게이트 |
 | `components/WbsApp.tsx` | `/api/wbs` 호출, 세션 쿠키 |
-| `components/Dashboard.tsx` | 부하 뷰 + 보기 전환 |
+| `components/Dashboard.tsx` | 부하 뷰 + 보기 전환. 일정승인과 같은 본부 칩 |
+| `components/DivisionChips.tsx` | 본부 필터 칩. 부하·일정승인 공통 |
 | `components/WbsCalendar.tsx` | 월력/주력 |
 | `components/TaskDetail.tsx` | 업무 상세. 권한 있으면 폼+저장. 최상위 지연은 하위 일괄 적용 체크 |
 | `app/api/wbs/route.ts` | 인증 후 노션 fetch |
