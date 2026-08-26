@@ -4,10 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { DashboardPayload, Task } from "@/lib/types";
 import {
   UNASSIGNED,
+  compareTasksByStatusThenStart,
   filterTasks,
   remainingEffort,
   servicesOf,
-  STATUS_SORT,
   taskStatus,
   todayKst,
   type TaskScope,
@@ -20,8 +20,10 @@ import {
 } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
 import { TaskScopeChips } from "@/components/TaskScopeChips";
+import { TaskFamilyBody } from "@/components/TaskFamilyBody";
 import { Pager, PageSizeSelect } from "@/components/Pager";
-import { pageSlice } from "@/lib/pager";
+import { pageGroups } from "@/lib/pager";
+import { groupTasksByRoot, treeDepthOf } from "@/lib/taskGroups";
 import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 function fmt(n: number, digits = 1): string {
@@ -90,10 +92,6 @@ export function ApprovalBoard({ token }: { token: string }) {
       hideDone,
       query,
       today,
-    }).sort((a, b) => {
-      const d = STATUS_SORT[taskStatus(a, today)] - STATUS_SORT[taskStatus(b, today)];
-      if (d !== 0) return d;
-      return (a.start ?? "9999").localeCompare(b.start ?? "9999");
     });
   }, [payload, taskScope, service, hideDone, query, today]);
 
@@ -103,9 +101,18 @@ export function ApprovalBoard({ token }: { token: string }) {
     () =>
       SCHEDULE_APPROVALS.map((key) => ({
         key,
-        tasks: scoped.filter((task) => scheduleApprovalOf(task) === key),
-      })).filter((group) => (approval ? group.key === approval : group.tasks.length > 0)),
-    [scoped, approval],
+        families: groupTasksByRoot(
+          scoped.filter((task) => scheduleApprovalOf(task) === key),
+          payload?.tasks ?? [],
+          compareTasksByStatusThenStart(today),
+        ),
+      }))
+        .map((group) => ({
+          ...group,
+          count: group.families.reduce((sum, family) => sum + family.tasks.length, 0),
+        }))
+        .filter((group) => (approval ? group.key === approval : group.count > 0)),
+    [scoped, approval, payload, today],
   );
 
   useEffect(() => {
@@ -202,20 +209,20 @@ export function ApprovalBoard({ token }: { token: string }) {
       ) : null}
 
       {groups.map((group) => {
-        const paged = pageSlice(group.tasks, pageByKey[group.key] ?? 1, pageSize);
+        const paged = pageGroups(group.families, pageByKey[group.key] ?? 1, pageSize);
         return (
         <section key={group.key} className="panel tasks-panel approval-panel">
           <div className="panel-head">
             <h2>
               {group.key}
-              {` · ${group.tasks.length}건`}
+              {` · ${group.count}건`}
             </h2>
-            {group.tasks.length > 0 ? (
+            {group.count > 0 ? (
               <PageSizeSelect value={pageSize} onChange={setPageSize} />
             ) : null}
           </div>
           <div className="table-wrap">
-            {group.tasks.length === 0 ? (
+            {group.count === 0 ? (
               <p className="empty">이 상태의 작업이 없습니다.</p>
             ) : (
               <table className="tasks">
@@ -233,13 +240,23 @@ export function ApprovalBoard({ token }: { token: string }) {
                     <th>잔여</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {paged.items.map((task) => {
+                <TaskFamilyBody
+                  families={paged.groups}
+                  colCount={10}
+                  renderRow={(task, meta) => {
                     const status = taskStatus(task, today);
                     const ap = scheduleApprovalOf(task);
                     const unassigned = task.assignees.length === 0;
+                    const depth = meta.inFamily && !meta.isFamilyRoot ? treeDepthOf(task) : 0;
+                    const classes = [
+                      unassigned ? "unassigned-task" : "",
+                      meta.isFamilyRoot ? "task-family-root" : "",
+                      meta.inFamily && !meta.isFamilyRoot ? "task-family-child" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
                     return (
-                      <tr key={task.id} className={unassigned ? "unassigned-task" : undefined}>
+                      <tr key={task.id} className={classes || undefined}>
                         <td className="col-approval">
                           <span className={`badge ap-${ap}`}>{ap}</span>
                         </td>
@@ -250,7 +267,12 @@ export function ApprovalBoard({ token }: { token: string }) {
                         <td className="col-attribute">{task.attribute ?? "—"}</td>
                         <td className="col-importance">{task.importance ?? "—"}</td>
                         <td>
-                          <TaskTitle task={task} />
+                          <div
+                            className="task-title-cell"
+                            style={{ ["--tree-depth" as string]: depth }}
+                          >
+                            <TaskTitle task={task} grouped={meta.inFamily && !meta.isFamilyRoot} />
+                          </div>
                         </td>
                         <td className="col-assignee">
                           {unassigned ? (
@@ -268,12 +290,12 @@ export function ApprovalBoard({ token }: { token: string }) {
                         </td>
                       </tr>
                     );
-                  })}
-                </tbody>
+                  }}
+                />
               </table>
             )}
           </div>
-          {group.tasks.length > 0 ? (
+          {group.count > 0 ? (
             <Pager
               page={paged.page}
               pages={paged.pages}

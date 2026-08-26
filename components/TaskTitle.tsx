@@ -9,13 +9,17 @@ export function TaskTitle({
   task,
   showIssue = true,
   issueMax = 120,
+  grouped = false,
 }: {
   task: TaskView;
   showIssue?: boolean;
   issueMax?: number;
+  /** 그룹 헤더에 최상위가 있으면 경로에서 루트 제목을 뺀다. */
+  grouped?: boolean;
 }) {
   const { open } = useTaskDetail();
   const path = (task.ancestorTitles ?? []).filter(Boolean);
+  const shownPath = grouped ? path.slice(1) : path;
   const issue = (task.issue ?? "").trim();
   const root = isRootTask({
     parentId: task.parentId ?? null,
@@ -23,7 +27,7 @@ export function TaskTitle({
   });
   return (
     <>
-      {path.length > 0 ? <div className="title-path">{path.join(" / ")}</div> : null}
+      {shownPath.length > 0 ? <div className="title-path">{shownPath.join(" / ")}</div> : null}
       <button className="title-link" type="button" onClick={() => open(task)}>
         {root ? <RootBadge /> : null}
         {task.title}

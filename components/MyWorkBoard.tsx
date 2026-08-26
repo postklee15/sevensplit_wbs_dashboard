@@ -7,10 +7,10 @@ import type { DashboardPayload, Task } from "@/lib/types";
 import {
   WEEKLY_CAPACITY,
   assigneesOf,
+  compareTasksByStatusThenStart,
   filterTasks,
   remainingEffort,
   servicesOf,
-  STATUS_SORT,
   taskStatus,
   todayKst,
   type TaskScope,
@@ -18,7 +18,9 @@ import {
 import { scheduleApprovalOf } from "@/lib/scheduleApproval";
 import { TaskTitle } from "@/components/TaskTitle";
 import { TaskScopeChips } from "@/components/TaskScopeChips";
+import { TaskFamilyBody } from "@/components/TaskFamilyBody";
 import { WbsCalendar } from "@/components/WbsCalendar";
+import { groupTasksByRoot, treeDepthOf } from "@/lib/taskGroups";
 import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 type MyView = "list" | "month" | "week";
@@ -218,12 +220,16 @@ export function MyWorkBoard({
       hideDone,
       query,
       today,
-    }).sort((a, b) => {
-      const d = STATUS_SORT[taskStatus(a, today)] - STATUS_SORT[taskStatus(b, today)];
-      if (d !== 0) return d;
-      return (a.start ?? "9999").localeCompare(b.start ?? "9999");
     });
   }, [payload, workName, taskScope, service, hideDone, query, today]);
+
+  const families = useMemo(
+    () =>
+      payload
+        ? groupTasksByRoot(mine, payload.tasks, compareTasksByStatusThenStart(today))
+        : [],
+    [payload, mine, today],
+  );
 
   const services = useMemo(() => (payload ? servicesOf(payload.tasks) : []), [payload]);
   const open = mine.filter((task) => taskStatus(task, today) !== "완료").length;
@@ -372,12 +378,21 @@ export function MyWorkBoard({
                   <th>잔여</th>
                 </tr>
               </thead>
-              <tbody>
-                {mine.map((task) => {
+              <TaskFamilyBody
+                families={families}
+                colCount={9}
+                renderRow={(task, meta) => {
                   const status = taskStatus(task, today);
                   const approval = scheduleApprovalOf(task);
+                  const depth = meta.inFamily && !meta.isFamilyRoot ? treeDepthOf(task) : 0;
+                  const classes = [
+                    meta.isFamilyRoot ? "task-family-root" : "",
+                    meta.inFamily && !meta.isFamilyRoot ? "task-family-child" : "",
+                  ]
+                    .filter(Boolean)
+                    .join(" ");
                   return (
-                    <tr key={task.id}>
+                    <tr key={task.id} className={classes || undefined}>
                       <td>
                         <span className={`badge ${status}`}>{status}</span>
                       </td>
@@ -388,7 +403,12 @@ export function MyWorkBoard({
                       <td>{task.attribute ?? "—"}</td>
                       <td>{task.importance ?? "—"}</td>
                       <td>
-                        <TaskTitle task={task} />
+                        <div
+                          className="task-title-cell"
+                          style={{ ["--tree-depth" as string]: depth }}
+                        >
+                          <TaskTitle task={task} grouped={meta.inFamily && !meta.isFamilyRoot} />
+                        </div>
                       </td>
                       <td>{dateRange(task)}</td>
                       <td>
@@ -399,8 +419,8 @@ export function MyWorkBoard({
                       </td>
                     </tr>
                   );
-                })}
-              </tbody>
+                }}
+              />
             </table>
           </div>
         </section>

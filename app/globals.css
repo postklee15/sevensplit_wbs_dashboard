@@ -492,6 +492,50 @@ table.tasks {
   background: #f7f1e8;
 }
 
+.task-title-cell {
+  padding-left: calc(var(--tree-depth, 0) * 14px);
+}
+
+table.tasks tbody.task-family td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+table.tasks tbody.task-family + tbody.task-family tr:first-child td {
+  border-top-width: 8px;
+  border-top-color: var(--paper);
+}
+
+table.tasks tbody.task-family tr.task-family-label td {
+  background: #f4e6d4;
+  padding-top: 12px;
+  padding-bottom: 8px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+table.tasks tbody.task-family tr.task-family-root td {
+  background: #f4e6d4;
+}
+
+table.tasks tbody.task-family tr.task-family-child td {
+  background: #fff8ef;
+}
+
+table.tasks tbody.task-family tr.task-family-child.unassigned-task td {
+  background: #f7f1e8;
+}
+
+.task-family-count {
+  margin-left: 8px;
+  color: var(--muted);
+  font-weight: 500;
+  font-size: 12px;
+}
+
+.task-family-label-text {
+  font-weight: 600;
+}
+
 .badge.ap-미지정 {
   color: var(--muted);
 }

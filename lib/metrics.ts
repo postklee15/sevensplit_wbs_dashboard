@@ -121,6 +121,16 @@ export const STATUS_SORT: Record<TaskStatus, number> = {
   완료: 5,
 };
 
+export function compareTasksByStatusThenStart(today = todayKst()) {
+  return (a: Task, b: Task) => {
+    const byStatus = STATUS_SORT[taskStatus(a, today)] - STATUS_SORT[taskStatus(b, today)];
+    if (byStatus !== 0) return byStatus;
+    const byStart = (a.start ?? "9999").localeCompare(b.start ?? "9999");
+    if (byStart !== 0) return byStart;
+    return a.title.localeCompare(b.title, "ko");
+  };
+}
+
 export function taskStatus(task: Task, today = todayKst()): TaskStatus {
   if (progressRatio(task) >= 1) return "완료";
   if (!task.start) return "일정없음";

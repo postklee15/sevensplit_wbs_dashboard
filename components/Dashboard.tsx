@@ -2,13 +2,15 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Pager, PageSizeSelect } from "@/components/Pager";
-import { pageSlice } from "@/lib/pager";
+import { pageGroups } from "@/lib/pager";
 import type { AccessProfile } from "@/lib/acl";
 import { canViewAllLoad } from "@/lib/acl";
 import type { DashboardPayload, Task } from "@/lib/types";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { TaskTitle } from "@/components/TaskTitle";
 import { TaskScopeChips } from "@/components/TaskScopeChips";
+import { TaskFamilyBody, type TaskFamilyRowMeta } from "@/components/TaskFamilyBody";
+import { groupTasksByRoot, treeDepthOf, type TaskFamily } from "@/lib/taskGroups";
 import {
   DAILY_CAPACITY,
   NO_SERVICE,
@@ -17,6 +19,7 @@ import {
   WEEKLY_CAPACITY,
   addDays,
   buildPersonRows,
+  compareTasksByStatusThenStart,
   filterTasks,
   isUnassignedRow,
   loadBand,
@@ -24,7 +27,6 @@ import {
   remainingEffort,
   servicesOf,
   summary,
-  STATUS_SORT,
   taskStatus,
   todayKst,
   unassignedDisplayName,
@@ -165,10 +167,6 @@ export function Dashboard({
         hideDone,
         query,
         today,
-      }).sort((a, b) => {
-        const d = STATUS_SORT[taskStatus(a, today)] - STATUS_SORT[taskStatus(b, today)];
-        if (d !== 0) return d;
-        return (a.start ?? "9999").localeCompare(b.start ?? "9999");
       }),
     [payload.tasks, taskScope, service, person, hideDone, query, today],
   );
@@ -180,6 +178,15 @@ export function Dashboard({
     () => visibleTasks.filter((task) => task.assignees.length === 0),
     [visibleTasks],
   );
+  const taskCompare = useMemo(() => compareTasksByStatusThenStart(today), [today]);
+  const unassignedFamilies = useMemo(
+    () => groupTasksByRoot(unassignedTasks, payload.tasks, taskCompare),
+    [unassignedTasks, payload.tasks, taskCompare],
+  );
+  const assignedFamilies = useMemo(
+    () => groupTasksByRoot(assignedTasks, payload.tasks, taskCompare),
+    [assignedTasks, payload.tasks, taskCompare],
+  );
 
   useEffect(() => {
     setUnassignedPage(1);
@@ -187,12 +194,12 @@ export function Dashboard({
   }, [taskScope, hideDone, service, person, query, pageSize]);
 
   const pagedUnassigned = useMemo(
-    () => pageSlice(unassignedTasks, unassignedPage, pageSize),
-    [unassignedTasks, unassignedPage, pageSize],
+    () => pageGroups(unassignedFamilies, unassignedPage, pageSize),
+    [unassignedFamilies, unassignedPage, pageSize],
   );
   const pagedAssigned = useMemo(
-    () => pageSlice(assignedTasks, assignedPage, pageSize),
-    [assignedTasks, assignedPage, pageSize],
+    () => pageGroups(assignedFamilies, assignedPage, pageSize),
+    [assignedFamilies, assignedPage, pageSize],
   );
 
   const fetched = new Date(payload.fetchedAt).toLocaleString("ko-KR", {
@@ -504,7 +511,7 @@ export function Dashboard({
                   <div className="table-wrap">
                     <TaskTable
                       heading={`미지정 · ${unassignedTasks.length}건`}
-                      tasks={pagedUnassigned.items}
+                      families={pagedUnassigned.groups}
                       today={today}
                     />
                   </div>
@@ -523,7 +530,7 @@ export function Dashboard({
                   <div className="table-wrap">
                     <TaskTable
                       heading={`담당 지정 · ${assignedTasks.length}건`}
-                      tasks={pagedAssigned.items}
+                      families={pagedAssigned.groups}
                       today={today}
                     />
                   </div>
@@ -602,11 +609,11 @@ function progressRatioPct(task: Task): number {
 
 function TaskTable({
   heading,
-  tasks,
+  families,
   today,
 }: {
   heading: string;
-  tasks: Task[];
+  families: TaskFamily[];
   today: string;
 }) {
   return (
@@ -628,19 +635,40 @@ function TaskTable({
         <tr className="task-group">
           <th colSpan={9}>{heading}</th>
         </tr>
-        {tasks.map((task) => (
-          <TaskRow key={task.id} task={task} today={today} />
-        ))}
       </tbody>
+      <TaskFamilyBody
+        families={families}
+        colCount={9}
+        renderRow={(task, meta) => (
+          <TaskRow key={task.id} task={task} today={today} meta={meta} />
+        )}
+      />
     </table>
   );
 }
 
-function TaskRow({ task, today }: { task: Task; today: string }) {
+function taskRowClass(task: Task, meta: TaskFamilyRowMeta): string | undefined {
+  const classes: string[] = [];
+  if (task.assignees.length === 0) classes.push("unassigned-task");
+  if (meta.isFamilyRoot) classes.push("task-family-root");
+  else if (meta.inFamily) classes.push("task-family-child");
+  return classes.length ? classes.join(" ") : undefined;
+}
+
+function TaskRow({
+  task,
+  today,
+  meta,
+}: {
+  task: Task;
+  today: string;
+  meta: TaskFamilyRowMeta;
+}) {
   const status = taskStatus(task, today);
   const unassigned = task.assignees.length === 0;
+  const depth = meta.inFamily && !meta.isFamilyRoot ? treeDepthOf(task) : 0;
   return (
-    <tr className={unassigned ? "unassigned-task" : undefined}>
+    <tr className={taskRowClass(task, meta)}>
       <td className="col-status">
         <span className={`badge ${status}`}>{status}</span>
       </td>
@@ -648,7 +676,9 @@ function TaskRow({ task, today }: { task: Task; today: string }) {
       <td className="col-attribute">{task.attribute ?? "—"}</td>
       <td className="col-importance">{task.importance ?? "—"}</td>
       <td>
-        <TaskTitle task={task} />
+        <div className="task-title-cell" style={{ ["--tree-depth" as string]: depth }}>
+          <TaskTitle task={task} grouped={meta.inFamily && !meta.isFamilyRoot} />
+        </div>
       </td>
       <td className="col-assignee">
         {unassigned ? <span className="badge 미지정">미지정</span> : task.assignees.join(", ")}
