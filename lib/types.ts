@@ -1,3 +1,5 @@
+import type { OrgMember, OrgUnit } from "./org";
+
 export type AssigneePerson = {
   id: string;
   name: string;
@@ -118,4 +120,8 @@ export type DashboardPayload = {
   fetchedAt: string;
   databaseTitle: string;
   tasks: Task[];
+  org?: {
+    units: OrgUnit[];
+    members: OrgMember[];
+  };
 };

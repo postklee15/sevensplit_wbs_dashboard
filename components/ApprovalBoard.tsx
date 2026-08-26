@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import type { AccessProfile } from "@/lib/acl";
+import { canViewAllLoad } from "@/lib/acl";
 import type { DashboardPayload, Task } from "@/lib/types";
 import {
   UNASSIGNED,
@@ -24,6 +26,7 @@ import { TaskFamilyBody } from "@/components/TaskFamilyBody";
 import { Pager, PageSizeSelect } from "@/components/Pager";
 import { pageGroups } from "@/lib/pager";
 import { groupTasksByRoot, treeDepthOf } from "@/lib/taskGroups";
+import { divisionsOf, taskMatchesOrgNames, unitName, workNamesForSelection } from "@/lib/org";
 import { useWbsDataRefresh } from "@/components/useWbsDataRefresh";
 
 function fmt(n: number, digits = 1): string {
@@ -45,7 +48,7 @@ function progressRatioPct(task: Task): number {
   return Math.min(task.progress, 100);
 }
 
-export function ApprovalBoard({ token }: { token: string }) {
+export function ApprovalBoard({ token, profile }: { token: string; profile: AccessProfile }) {
   const today = todayKst();
   const [payload, setPayload] = useState<DashboardPayload | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +59,7 @@ export function ApprovalBoard({ token }: { token: string }) {
   const [query, setQuery] = useState("");
   const [approval, setApproval] = useState<ScheduleApproval | null>(null);
   const [pageSize, setPageSize] = useState(20);
+  const [divisionId, setDivisionId] = useState<string | null>(profile.divisionId || null);
   const [pageByKey, setPageByKey] = useState<Partial<Record<ScheduleApproval, number>>>({});
 
   const load = useCallback(async () => {
@@ -83,9 +87,28 @@ export function ApprovalBoard({ token }: { token: string }) {
 
   useWbsDataRefresh(load);
 
+  const viewAll = canViewAllLoad(profile);
+  const orgUnits = payload?.org?.units ?? [];
+  const orgMembers = payload?.org?.members ?? [];
+  const divisionOptions = useMemo(() => {
+    const all = divisionsOf(orgUnits);
+    if (profile.role === "superAdmin") return all;
+    if (profile.divisionId) return all.filter((unit) => unit.id === profile.divisionId);
+    return all;
+  }, [orgUnits, profile.role, profile.divisionId]);
+  const orgNames = useMemo(
+    () => workNamesForSelection(orgMembers, divisionId, null),
+    [orgMembers, divisionId],
+  );
+
+  useEffect(() => {
+    if (profile.divisionId) setDivisionId(profile.divisionId);
+  }, [profile.divisionId]);
+
   const scoped = useMemo(() => {
     if (!payload) return [];
-    return filterTasks(payload.tasks, {
+    const inOrg = payload.tasks.filter((task) => taskMatchesOrgNames(task.assignees, orgNames));
+    return filterTasks(inOrg, {
       taskScope,
       service,
       person: null,
@@ -93,7 +116,7 @@ export function ApprovalBoard({ token }: { token: string }) {
       query,
       today,
     });
-  }, [payload, taskScope, service, hideDone, query, today]);
+  }, [payload, taskScope, service, hideDone, query, today, orgNames]);
 
   const counts = useMemo(() => countByScheduleApproval(scoped), [scoped]);
   const services = useMemo(() => (payload ? servicesOf(payload.tasks) : []), [payload]);
@@ -117,7 +140,7 @@ export function ApprovalBoard({ token }: { token: string }) {
 
   useEffect(() => {
     setPageByKey({});
-  }, [taskScope, hideDone, service, query, approval, pageSize]);
+  }, [taskScope, hideDone, service, query, approval, pageSize, divisionId]);
 
   const fetched = payload
     ? new Date(payload.fetchedAt).toLocaleString("ko-KR", { timeZone: "Asia/Seoul" })
@@ -130,7 +153,10 @@ export function ApprovalBoard({ token }: { token: string }) {
           <p className="kicker">Split Invest · {payload?.databaseTitle ?? "WBS"}</p>
           <h1>일정 승인</h1>
           <p className="sub">
-            노션 일정승인 기준으로 나눕니다. 값이 없으면 미지정입니다.
+            {viewAll
+              ? "같은 본부 인원의 일정만 승인할 수 있습니다."
+              : "내 담당 작업의 일정만 봅니다."}
+            {divisionId && unitName(orgUnits, divisionId) ? ` · ${unitName(orgUnits, divisionId)}` : ""}
             {fetched ? ` · ${fetched} 동기화` : ""}
           </p>
         </div>
@@ -155,6 +181,30 @@ export function ApprovalBoard({ token }: { token: string }) {
       </header>
 
       {error ? <p className="auth-error">{error}</p> : null}
+
+      {viewAll && divisionOptions.length > 0 ? (
+        <section className="chips" aria-label="본부 필터">
+          {profile.role === "superAdmin" ? (
+            <button
+              className={`chip ${divisionId === null ? "on" : ""}`}
+              type="button"
+              onClick={() => setDivisionId(null)}
+            >
+              전체 본부
+            </button>
+          ) : null}
+          {divisionOptions.map((unit) => (
+            <button
+              key={unit.id}
+              className={`chip ${divisionId === unit.id ? "on" : ""}`}
+              type="button"
+              onClick={() => setDivisionId(unit.id)}
+            >
+              {unit.name}
+            </button>
+          ))}
+        </section>
+      ) : null}
 
       <section className="chips" aria-label="서비스 필터">
         <button

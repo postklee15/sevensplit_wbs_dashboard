@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import type { User } from "firebase/auth";
 import { signOut } from "firebase/auth";
 import type { AccessProfile } from "@/lib/acl";
-import { ROLE_LABEL } from "@/lib/acl";
+import { canManageAccess, ROLE_LABEL } from "@/lib/acl";
 import { auth } from "@/lib/firebase";
 import { clearSessionCookie } from "@/lib/sessionCookie";
 
@@ -40,18 +40,14 @@ export function SiteNav({
             성과
           </Link>
         ) : null}
-        {profile.isSuperAdmin ? (
+        {canManageAccess(profile) ? (
           <Link className={`chip ${pathname.startsWith("/admin") ? "on" : ""}`} href="/admin/access">
             권한
           </Link>
         ) : null}
       </div>
       <span className="account-chip">
-        {profile.isSuperAdmin ? (
-          <span className="badge">{ROLE_LABEL.superAdmin}</span>
-        ) : (
-          <span className="badge">{ROLE_LABEL[profile.role]}</span>
-        )}
+        <span className="badge">{ROLE_LABEL[profile.role]}</span>
         {profile.workName ? <span className="work-name">{profile.workName}</span> : null}
         <Link className={`chip ${pathname === "/profile" ? "on" : ""}`} href="/profile">
           프로필

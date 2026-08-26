@@ -1,5 +1,5 @@
 import {
-  applySuperAdmin,
+  applyDirectorDefaults,
   isSuperAdminEmail,
   normalizeEmail,
   parseRole,
@@ -19,7 +19,7 @@ function toProfile(
 ): AccessProfile {
   const email = normalizeEmail(strField(fields, "email") || emailFallback);
   const superAdmin = isSuperAdminEmail(email);
-  return applySuperAdmin({
+  return applyDirectorDefaults({
     uid,
     email,
     displayName: strField(fields, "displayName"),
@@ -29,6 +29,8 @@ function toProfile(
     slackMemberId: strField(fields, "slackMemberId").trim(),
     role: parseRole(strField(fields, "role"), superAdmin),
     isSuperAdmin: superAdmin,
+    divisionId: strField(fields, "divisionId").trim(),
+    teamId: strField(fields, "teamId").trim(),
     createdAt: strField(fields, "createdAt") || null,
     lastSeenAt: strField(fields, "lastSeenAt") || null,
   });
@@ -57,6 +59,8 @@ export async function heartbeatUser(opts: {
         canPerformance: superAdmin,
         slackMemberId: "",
         role: "member",
+        divisionId: "",
+        teamId: "",
         createdAt: now,
         lastSeenAt: now,
       },
@@ -68,11 +72,13 @@ export async function heartbeatUser(opts: {
         "canPerformance",
         "slackMemberId",
         "role",
+        "divisionId",
+        "teamId",
         "createdAt",
         "lastSeenAt",
       ],
     );
-    return applySuperAdmin({
+    return applyDirectorDefaults({
       uid: opts.uid,
       email,
       displayName: opts.displayName,
@@ -82,6 +88,8 @@ export async function heartbeatUser(opts: {
       slackMemberId: "",
       role: parseRole("member", superAdmin),
       isSuperAdmin: superAdmin,
+      divisionId: "",
+      teamId: "",
       createdAt: now,
       lastSeenAt: now,
     });
@@ -105,7 +113,7 @@ export async function listProfiles(token: string): Promise<AccessProfile[]> {
     .filter((profile) => Boolean(profile.email))
     .sort((a, b) => {
       const rank = (role: AccessProfile["role"]) =>
-        role === "superAdmin" ? 0 : role === "lead" ? 1 : 2;
+        role === "superAdmin" ? 0 : role === "director" ? 1 : role === "lead" ? 2 : 3;
       const delta = rank(a.role) - rank(b.role);
       if (delta !== 0) return delta;
       return a.email.localeCompare(b.email);
@@ -129,6 +137,8 @@ export async function updateAccess(
     slackMemberId?: string;
     workName?: string;
     role?: OrgRole;
+    divisionId?: string;
+    teamId?: string;
   },
 ): Promise<AccessProfile> {
   const existing = await getDocument(token, COLLECTION, uid);
@@ -157,20 +167,46 @@ export async function updateAccess(
     await patchDocument(token, COLLECTION, uid, fields, mask);
     return { ...current, ...fields };
   }
-  const role: OrgRole =
-    patch.role === "lead" || patch.role === "member" ? patch.role : current.role === "lead" ? "lead" : "member";
+
+  let role: OrgRole = current.role === "director" || current.role === "lead" ? current.role : "member";
+  if (patch.role === "director" || patch.role === "lead" || patch.role === "member") {
+    role = patch.role;
+  }
+  let divisionId = patch.divisionId !== undefined ? patch.divisionId.trim() : current.divisionId;
+  let teamId = patch.teamId !== undefined ? patch.teamId.trim() : current.teamId;
+  if (role === "director") teamId = "";
   const next = {
-    canDashboard: role === "lead" ? true : (patch.canDashboard ?? current.canDashboard),
-    canPerformance: patch.canPerformance ?? current.canPerformance,
+    canDashboard: role === "lead" || role === "director" ? true : (patch.canDashboard ?? current.canDashboard),
+    canPerformance: role === "director" ? true : (patch.canPerformance ?? current.canPerformance),
     slackMemberId,
     workName,
     role,
+    divisionId,
+    teamId,
   };
-  const mask = ["canDashboard", "canPerformance", "role"];
+  const mask = ["canDashboard", "canPerformance", "role", "divisionId", "teamId"];
   if (patch.slackMemberId !== undefined) mask.push("slackMemberId");
   if (patch.workName !== undefined) mask.push("workName");
   await patchDocument(token, COLLECTION, uid, next, mask);
   return { ...current, ...next };
+}
+
+export async function clearOrgMembership(
+  token: string,
+  profiles: AccessProfile[],
+  removedIds: string[],
+): Promise<void> {
+  const removed = new Set(removedIds);
+  for (const profile of profiles) {
+    if (profile.isSuperAdmin) continue;
+    const dropDivision = removed.has(profile.divisionId);
+    const dropTeam = removed.has(profile.teamId);
+    if (!dropDivision && !dropTeam) continue;
+    await updateAccess(token, profile.uid, {
+      divisionId: dropDivision ? "" : profile.divisionId,
+      teamId: dropDivision || dropTeam ? "" : profile.teamId,
+    });
+  }
 }
 
 export async function updateWorkName(

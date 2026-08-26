@@ -6,6 +6,7 @@ import { pageGroups } from "@/lib/pager";
 import type { AccessProfile } from "@/lib/acl";
 import { canViewAllLoad } from "@/lib/acl";
 import type { DashboardPayload, Task } from "@/lib/types";
+import { divisionsOf, teamsOf, taskMatchesOrgNames, unitName, workNamesForSelection } from "@/lib/org";
 import { WbsCalendar } from "@/components/WbsCalendar";
 import { TaskTitle } from "@/components/TaskTitle";
 import { TaskScopeChips } from "@/components/TaskScopeChips";
@@ -85,6 +86,18 @@ export function Dashboard({
   const weeks = useMemo(() => weekStarts(today), [today]);
   const viewAll = canViewAllLoad(profile);
   const ownName = profile.workName.trim();
+  const orgUnits = payload.org?.units ?? [];
+  const orgMembers = payload.org?.members ?? [];
+  const divisionOptions = useMemo(() => {
+    const all = divisionsOf(orgUnits);
+    if (profile.role === "superAdmin") return all;
+    if (profile.divisionId) return all.filter((unit) => unit.id === profile.divisionId);
+    return all;
+  }, [orgUnits, profile.role, profile.divisionId]);
+  const [divisionId, setDivisionId] = useState<string | null>(profile.divisionId || null);
+  const [teamId, setTeamId] = useState<string | null>(
+    profile.role === "lead" ? profile.teamId || null : null,
+  );
   const [taskScope, setTaskScope] = useState<TaskScope>("leaf");
   const [hideDone, setHideDone] = useState(true);
   const [service, setService] = useState<string | null>(null);
@@ -102,6 +115,25 @@ export function Dashboard({
     if (!viewAll) setPerson(ownName || null);
   }, [viewAll, ownName]);
 
+  useEffect(() => {
+    if (profile.divisionId) setDivisionId(profile.divisionId);
+  }, [profile.divisionId]);
+
+  const teamOptions = useMemo(
+    () => (divisionId ? teamsOf(orgUnits, divisionId) : []),
+    [orgUnits, divisionId],
+  );
+
+  const orgNames = useMemo(
+    () => workNamesForSelection(orgMembers, viewAll ? divisionId : profile.divisionId || divisionId, teamId),
+    [orgMembers, viewAll, divisionId, teamId, profile.divisionId],
+  );
+
+  const orgTasks = useMemo(
+    () => payload.tasks.filter((task) => taskMatchesOrgNames(task.assignees, orgNames)),
+    [payload.tasks, orgNames],
+  );
+
   function pickPerson(name: string | null) {
     if (!viewAll) return;
     setPerson(name);
@@ -109,7 +141,7 @@ export function Dashboard({
 
   const scoped = useMemo(() => {
     if (!viewAll && !ownName) return [];
-    return filterTasks(payload.tasks, {
+    return filterTasks(orgTasks, {
       taskScope: taskScope === "all" ? "all" : "leaf",
       service,
       person: viewAll ? null : ownName,
@@ -117,7 +149,7 @@ export function Dashboard({
       query: "",
       today,
     });
-  }, [payload.tasks, taskScope, service, today, viewAll, ownName]);
+  }, [orgTasks, taskScope, service, today, viewAll, ownName]);
 
   const rows = useMemo(() => {
     const built = buildPersonRows(scoped, today, weeks);
@@ -125,7 +157,7 @@ export function Dashboard({
     return built.filter((row) => row.name === ownName);
   }, [scoped, today, weeks, viewAll, ownName]);
   const totals = useMemo(() => summary(rows), [rows]);
-  const services = useMemo(() => servicesOf(payload.tasks), [payload.tasks]);
+  const services = useMemo(() => servicesOf(orgTasks), [orgTasks]);
 
   const peopleLoad = useMemo(() => {
     return rows
@@ -160,7 +192,7 @@ export function Dashboard({
 
   const visibleTasks = useMemo(
     () =>
-      filterTasks(payload.tasks, {
+      filterTasks(orgTasks, {
         taskScope,
         service,
         person,
@@ -168,7 +200,7 @@ export function Dashboard({
         query,
         today,
       }),
-    [payload.tasks, taskScope, service, person, hideDone, query, today],
+    [orgTasks, taskScope, service, person, hideDone, query, today],
   );
   const assignedTasks = useMemo(
     () => visibleTasks.filter((task) => task.assignees.length > 0),
@@ -191,7 +223,7 @@ export function Dashboard({
   useEffect(() => {
     setUnassignedPage(1);
     setAssignedPage(1);
-  }, [taskScope, hideDone, service, person, query, pageSize]);
+  }, [taskScope, hideDone, service, person, query, pageSize, divisionId, teamId]);
 
   const pagedUnassigned = useMemo(
     () => pageGroups(unassignedFamilies, unassignedPage, pageSize),
@@ -201,6 +233,12 @@ export function Dashboard({
     () => pageGroups(assignedFamilies, assignedPage, pageSize),
     [assignedFamilies, assignedPage, pageSize],
   );
+
+  const orgLabel = divisionId
+    ? `${unitName(orgUnits, divisionId) || "본부"}${teamId ? ` · ${unitName(orgUnits, teamId)}` : " · 전체"}`
+    : viewAll
+      ? "전체 본부"
+      : "";
 
   const fetched = new Date(payload.fetchedAt).toLocaleString("ko-KR", {
     timeZone: "Asia/Seoul",
@@ -212,9 +250,9 @@ export function Dashboard({
         <div>
           <p className="kicker">Split Invest · {payload.databaseTitle}</p>
           <h1>{viewAll ? "담당자별 리소스 현황" : `내 부하 · ${ownName || "이름 없음"}`}</h1>
-      <p className="sub">
+          <p className="sub">
             {viewAll
-              ? `${taskScope === "all" ? "상위·하위 포함 공수" : "하위 작업 공수 기준"} · 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
+              ? `${orgLabel ? `${orgLabel} · ` : ""}${taskScope === "all" ? "상위·하위 포함 공수" : "하위 작업 공수 기준"} · 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
               : ownName
                 ? `팀원은 본인 담당 작업만 봅니다. 주 용량 ${WEEKLY_CAPACITY}인일 · ${today} 기준 · ${fetched} 동기화`
                 : "프로필에 노션 담당자 이름을 저장해야 내 부하를 표시합니다."}
@@ -267,6 +305,59 @@ export function Dashboard({
           </button>
         </div>
       </header>
+
+      {viewAll && divisionOptions.length > 0 ? (
+        <section className="chips" aria-label="조직 필터">
+          {profile.role === "superAdmin" || divisionOptions.length > 1 ? (
+            <button
+              className={`chip ${divisionId === null ? "on" : ""}`}
+              type="button"
+              onClick={() => {
+                setDivisionId(null);
+                setTeamId(null);
+              }}
+            >
+              전체 본부
+            </button>
+          ) : null}
+          {divisionOptions.map((unit) => (
+            <button
+              key={unit.id}
+              className={`chip ${divisionId === unit.id ? "on" : ""}`}
+              type="button"
+              onClick={() => {
+                setDivisionId(unit.id);
+                setTeamId(null);
+              }}
+            >
+              {unit.name}
+            </button>
+          ))}
+          {divisionId && teamOptions.length > 0 ? (
+            <>
+              <button
+                className={`chip ${teamId === null ? "on" : ""}`}
+                type="button"
+                onClick={() => setTeamId(null)}
+              >
+                본부 전체
+              </button>
+              {teamOptions.map((unit) => (
+                <button
+                  key={unit.id}
+                  className={`chip ${teamId === unit.id ? "on" : ""}`}
+                  type="button"
+                  onClick={() => setTeamId(unit.id === teamId ? null : unit.id)}
+                >
+                  {unit.name}
+                </button>
+              ))}
+            </>
+          ) : null}
+        </section>
+      ) : viewAll && divisionOptions.length === 0 ? (
+        <p className="hint">권한 화면에서 본부·팀을 만들면 조직별로 부하를 나눌 수 있습니다.</p>
+      ) : null}
 
       <section className="chips" aria-label="서비스 필터">
         <button

@@ -7,6 +7,8 @@ import { normalizeNotionId } from "@/lib/notionIds";
 import { fetchWbsSchema, PatchError, patchWbsPage } from "@/lib/notionWrite";
 import { assertCanCascadeDelay, cascadeDelayToDescendants, rootLooksDelayed } from "@/lib/wbsDelayCascade";
 import type { TaskWriteBody } from "@/lib/types";
+import { loadOrgContext } from "@/lib/wbsOrg";
+import type { WbsAccessScope } from "@/lib/acl";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -30,7 +32,15 @@ async function loadProfile(request: Request) {
       ),
     };
   }
-  return { profile };
+  return { profile, token: auth.token };
+}
+
+async function scopeOf(token: string, profile: Awaited<ReturnType<typeof heartbeatUser>>): Promise<WbsAccessScope> {
+  try {
+    return (await loadOrgContext(token, profile)).scope;
+  } catch {
+    return { kind: "self", workNames: new Set(profile.workName.trim() ? [profile.workName.trim()] : []) };
+  }
 }
 
 export async function GET(request: Request, ctx: RouteCtx) {
@@ -43,7 +53,7 @@ export async function GET(request: Request, ctx: RouteCtx) {
     if (!inDatabase) {
       return NextResponse.json({ error: "노션 페이지를 찾지 못했습니다." }, { status: 404 });
     }
-    if (!canReadWbsTask(loaded.profile, task.assignees)) {
+    if (!canReadWbsTask(loaded.profile, task.assignees, await scopeOf(loaded.token, loaded.profile))) {
       return NextResponse.json({ error: "이 작업을 볼 권한이 없습니다." }, { status: 403 });
     }
     return NextResponse.json({ task });
@@ -77,15 +87,16 @@ export async function PATCH(request: Request, ctx: RouteCtx) {
     if (!inDatabase) {
       return NextResponse.json({ error: "노션 페이지를 찾지 못했습니다." }, { status: 404 });
     }
-    if (!canEditWbsTask(loaded.profile, task.assignees)) {
+    const scope = await scopeOf(loaded.token, loaded.profile);
+    if (!canEditWbsTask(loaded.profile, task.assignees, scope)) {
       return NextResponse.json(
-        { error: "이 작업을 수정할 권한이 없습니다. 팀원은 본인 담당 작업만 저장할 수 있습니다." },
+        { error: "이 작업을 수정할 권한이 없습니다. 같은 본부 인원의 일정만 승인·저장할 수 있습니다." },
         { status: 403 },
       );
     }
-    if (cascadeDelay && !canCascadeWbsDelay(loaded.profile)) {
+    if (cascadeDelay && !canCascadeWbsDelay(loaded.profile, scope)) {
       return NextResponse.json(
-        { error: "하위 일괄 지연은 팀장·슈퍼관리자만 할 수 있습니다." },
+        { error: "하위 일괄 지연은 본부장·팀장·슈퍼관리자만 할 수 있습니다." },
         { status: 403 },
       );
     }

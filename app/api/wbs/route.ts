@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
-import { canOpenPage, canViewAllLoad } from "@/lib/acl";
+import { canOpenPage } from "@/lib/acl";
 import { jsonAuthError, requireSevensplitUser } from "@/lib/adminAuth";
 import { heartbeatUser } from "@/lib/aclStore";
-import { filterTasks } from "@/lib/metrics";
 import { fetchWbsTasks } from "@/lib/notion";
+import { filterTasksByScope, loadOrgContext, orgPayloadForProfile } from "@/lib/wbsOrg";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -28,22 +28,21 @@ export async function GET(request: Request) {
       );
     }
     const { databaseTitle, tasks: allTasks } = await fetchWbsTasks();
-    const ownName = profile.workName.trim();
-    const tasks = canViewAllLoad(profile)
-      ? allTasks
-      : ownName
-        ? filterTasks(allTasks, {
-            leafOnly: false,
-            service: null,
-            person: ownName,
-            hideDone: false,
-            query: "",
-          })
-        : [];
+    let org: ReturnType<typeof orgPayloadForProfile> = { units: [], members: [] };
+    let scope;
+    try {
+      const context = await loadOrgContext(auth.token, profile);
+      org = orgPayloadForProfile(profile, context.members, context.units, context.scope);
+      scope = context.scope;
+    } catch {
+      scope = { kind: "self" as const, workNames: new Set(profile.workName.trim() ? [profile.workName.trim()] : []) };
+    }
+    const tasks = filterTasksByScope(allTasks, profile, scope);
     return NextResponse.json({
       fetchedAt: new Date().toISOString(),
       databaseTitle,
       tasks,
+      org,
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : "노션 조회에 실패했습니다.";

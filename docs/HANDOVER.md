@@ -18,10 +18,10 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 | 보기 | 역할 | 접근 |
 |---|---|---|
 | 내 업무 `/my` | 프로필에 저장한 노션 담당자 이름의 작업만. 목록·월력·주력 | 부하와 같은 권한 (`canDashboard`). 이름이 없으면 `/profile` |
-| 부하 / 월력 / 주력 | 담당자별 주간·일간 부하. 팀장은 전 인원, 팀원은 본인만 | 슈퍼관리자·팀장: 전 인원. 팀원: 본인 (`canDashboard`) |
-| 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같은 권한 (`canDashboard`). 팀원 API는 본인 작업만 |
-| 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자 또는 허용된 계정 |
-| 권한 `/admin/access` | 역할(슈퍼관리자/팀장/팀원)·페이지 권한 | **슈퍼관리자만** (`shlim@sevensplit.com`) |
+| 부하 / 월력 / 주력 | 담당자별 주간·일간 부하. 본부·팀 칩 | 슈퍼관리자: 전사. 본부장·팀장: 자기 본부. 팀원: 본인 (`canDashboard`) |
+| 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같음. **본부 단위로 격리**. 팀원 API는 본인 작업만 |
+| 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자·본부장 또는 허용된 계정 |
+| 권한 `/admin/access` | 조직 트리·역할(본부장/팀장/팀원)·페이지 권한 | **슈퍼관리자·본부장** (`shlim@sevensplit.com`은 전사) |
 | 프로필 `/profile` | 내 업무에 쓸 노션 담당자 이름(`workName`) | 로그인한 `@sevensplit.com` |
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김. 칩으로 **최상위만** · **전체**. 목록은 **최상위 트리로 묶고**, 최상위 행이 없으면 제목 줄을 둔다. 최상위 행·상세·달력 라벨에 **최상위** 배지. 부하 KPI는 최상위만 골라도 하위 공수 기준.
@@ -97,7 +97,7 @@ npm run dev   # next dev --turbopack
   JSON { fetchedAt, databaseTitle, tasks }
 클라이언트
   Dashboard / WbsCalendar / PerformanceBoard
-  AccessAdmin (슈퍼관리자)
+  AccessAdmin (슈퍼관리자·본부장. 조직 트리)
   ProfileGate → POST /api/me (Firestore users/{uid})
 ```
 
@@ -127,9 +127,12 @@ npm run dev   # next dev --turbopack
 | `lib/metrics.ts` | 잔여 공수, 주간 부하, 용량 |
 | `lib/calendar.ts` | 캘린더 레이아웃 |
 | `app/performance/page.tsx` | 완료 작업 성과. ACL 필요 |
-| `app/admin/access/page.tsx` | 슈퍼관리자 권한 UI |
-| `lib/acl.ts` | `shlim@sevensplit.com` 슈퍼관리자 |
-| `firestore.rules` | `users/{uid}` ACL. firebase-admin 없음 |
+| `app/admin/access/page.tsx` | 슈퍼관리자·본부장 권한·조직 UI |
+| `components/OrgTreeAdmin.tsx` | 본부–팀 트리 추가/이름/삭제 |
+| `lib/acl.ts` | `shlim@sevensplit.com` 슈퍼관리자. 역할 `director`/`lead`/`member`. 본부 범위 |
+| `lib/org.ts` / `lib/orgStore.ts` / `lib/wbsOrg.ts` | 조직 단위·WBS 범위 |
+| `app/api/org/route.ts` | 본부·팀 CRUD |
+| `firestore.rules` | `users/{uid}` ACL + `orgUnits`. firebase-admin 없음 |
 | `firebase.json` | Hosting source `.` + webframeworks `asia-northeast3` |
 | `.github/workflows/deploy.yml` | `main` 푸시 → Firebase Hosting |
 
@@ -272,10 +275,10 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 2. **Next config 경고** — Cloud Function 로그에 `Unrecognized key(s): '__esModule', 'default'`. firebase-frameworks가 `next.config.ts`를 감싸면서 생김. 앱 동작에는 보통 지장 없음.
 3. **CD가 이 커밋 전까지는 한 번도 `main`에서 안 돌아갔을 수 있음.** 푸시 후 workflow 성공 여부를 확인하세요.
 4. Hosting webframeworks는 **실험 기능**. `firebase-functions` peer / `firebase-admin` 버전 충돌이 났었음. admin을 다시 추가하면 frameworks 패키징이 깨질 수 있음.
-5. 캘린더/부하 필터는 클라이언트만. `/api/wbs`는 팀장·슈퍼관리자에게 DB 통째, 팀원에게는 본인 담당만.
+5. 캘린더/부하 필터는 클라이언트. `/api/wbs`는 슈퍼관리자 전사, 본부장·팀장은 자기 본부(`workName`), 팀원은 본인 담당만.
 6. 용량 5인일·평일만 배분·주말 제외는 제품 가정입니다. 바꾸려면 `WEEKLY_CAPACITY`와 `buildPersonRows`를 보면 됩니다.
-7. 업무 상세 저장은 `PATCH /api/wbs/[id]`. 팀장·슈퍼관리자 전체, 팀원은 `workName`이 담당자와 완전 일치할 때만. 인테그레이션에 DB 편집 권한이 필요하다.
-8. 최상위 작업을 지연으로 저장할 때 팀장·슈퍼관리자는 `cascadeDelay`로 하위 전체에 추가 일정·지연사유·일정승인(지연)을 복사한다. 하위가 많으면 일부만 적용될 수 있어 다시 저장한다.
+7. 업무 상세 저장은 `PATCH /api/wbs/[id]`. 같은 본부 범위의 본부장·팀장·슈퍼관리자, 팀원은 `workName`이 담당자와 완전 일치할 때만. 인테그레이션에 DB 편집 권한이 필요하다.
+8. 최상위 작업을 지연으로 저장할 때 본부장·팀장·슈퍼관리자는 `cascadeDelay`로 하위 전체에 추가 일정·지연사유·일정승인(지연)을 복사한다. 하위가 많으면 일부만 적용될 수 있어 다시 저장한다.
 
 ---
 
@@ -293,7 +296,7 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 ## 12. 다음 에이전트에게 추천하는 첫 작업
 
 1. GitHub Actions `Deploy` 워크플로가 이 푸시에서 초록인지 확인.
-2. 라이브에서 `@sevensplit.com` 로그인 → 대시보드 로드 → 업무 상세에서 저장(팀장 전체, 팀원은 본인만). 팀장으로 최상위 지연 일괄도 확인.
+2. 라이브에서 `@sevensplit.com` 로그인 → 권한 화면에서 본부·팀·본부장 지정 → 부하가 조직별로 나뉘고, 일정승인이 다른 본부에 막히는지 확인.
 3. 저장이 502면 노션 인테그레이션의 DB 편집 권한을 확인.
 4. 필요하면 favicon, next.config 경고, 부하 가정(주 5인일) 조정을 이어가면 됨.
 

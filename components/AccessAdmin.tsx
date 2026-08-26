@@ -2,7 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { AccessProfile, OrgRole } from "@/lib/acl";
-import { ROLE_LABEL } from "@/lib/acl";
+import { ROLE_LABEL, canAssignRole, profilesVisibleTo } from "@/lib/acl";
+import type { OrgUnit } from "@/lib/org";
+import { divisionsOf, teamsOf } from "@/lib/org";
+import { OrgTreeAdmin } from "@/components/OrgTreeAdmin";
 import type { ProjectPm } from "@/lib/alertStore";
 
 type PreviewRow = {
@@ -42,6 +45,7 @@ function userLabel(user: AccessProfile): string {
 
 export function AccessAdmin({ token, me }: { token: string; me: AccessProfile }) {
   const [users, setUsers] = useState<AccessProfile[]>([]);
+  const [units, setUnits] = useState<OrgUnit[]>([]);
   const [pms, setPms] = useState<ProjectPm[]>([]);
   const [services, setServices] = useState<string[]>([]);
   const [preview, setPreview] = useState<RunResult | null>(null);
@@ -61,6 +65,13 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
     setUsers(body.users ?? []);
   }, [token]);
 
+  const loadOrg = useCallback(async () => {
+    const res = await fetch("/api/org", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
+    const body = (await res.json()) as { units?: OrgUnit[]; error?: string };
+    if (!res.ok) throw new Error(body.error || `조직 조회 실패 (${res.status})`);
+    setUnits(body.units ?? []);
+  }, [token]);
+
   const loadPms = useCallback(async () => {
     const res = await fetch("/api/alerts/pms", { headers: { Authorization: `Bearer ${token}` }, cache: "no-store" });
     const body = (await res.json()) as { pms?: ProjectPm[]; services?: string[]; error?: string };
@@ -72,11 +83,11 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
   const load = useCallback(async () => {
     setError(null);
     try {
-      await Promise.all([loadUsers(), loadPms()]);
+      await Promise.all([loadUsers(), loadPms(), loadOrg()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "목록을 불러오지 못했습니다.");
     }
-  }, [loadUsers, loadPms]);
+  }, [loadUsers, loadPms, loadOrg]);
 
   useEffect(() => {
     void load();
@@ -84,7 +95,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
 
   async function applyPatch(
     user: AccessProfile,
-    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName" | "role">>,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName" | "role" | "divisionId" | "teamId">>,
   ) {
     const res = await fetch("/api/acl", {
       method: "PATCH",
@@ -98,7 +109,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
 
   async function save(
     user: AccessProfile,
-    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName" | "role">>,
+    patch: Partial<Pick<AccessProfile, "canDashboard" | "canPerformance" | "slackMemberId" | "workName" | "role" | "divisionId" | "teamId">>,
   ) {
     setBusy(user.uid);
     setError(null);
@@ -177,6 +188,61 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
   }
 
   const pmByService = useMemo(() => new Map(pms.map((row) => [row.service, row.pmUid])), [pms]);
+  const visibleUsers = useMemo(() => profilesVisibleTo(me, users), [users, me]);
+  const divisionOptions = divisionsOf(units);
+
+  async function createUnit(input: { name: string; kind: "division" | "team"; parentId?: string }) {
+    setBusy("org");
+    setError(null);
+    try {
+      const res = await fetch("/api/org", {
+        method: "POST",
+        headers,
+        body: JSON.stringify(input),
+      });
+      const body = (await res.json()) as { unit?: OrgUnit; error?: string };
+      if (!res.ok || !body.unit) throw new Error(body.error || "조직 생성 실패");
+      await loadOrg();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "조직을 만들지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function renameUnit(id: string, name: string) {
+    setBusy("org");
+    setError(null);
+    try {
+      const res = await fetch("/api/org", {
+        method: "PATCH",
+        headers,
+        body: JSON.stringify({ id, name }),
+      });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error || "이름 변경 실패");
+      await loadOrg();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "조직 이름을 바꾸지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function deleteUnit(id: string) {
+    setBusy("org");
+    setError(null);
+    try {
+      const res = await fetch(`/api/org?id=${encodeURIComponent(id)}`, { method: "DELETE", headers });
+      const body = (await res.json()) as { error?: string };
+      if (!res.ok) throw new Error(body.error || "삭제 실패");
+      await Promise.all([loadOrg(), loadUsers()]);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "조직을 삭제하지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   return (
     <main className="shell wide">
@@ -185,9 +251,9 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
           <p className="kicker">Split Invest · 접근 권한</p>
           <h1>사용자 권한</h1>
           <p className="sub">
-            {me.email} 슈퍼관리자만 이 화면을 엽니다. 역할은 슈퍼관리자 · 팀장 · 팀원입니다. 팀장은 부하에서 전 인원을
-            보고, 팀원(구성원)은 본인 부하만 봅니다. 업무 이름은 노션 담당자와 같게 넣으세요. Slack 칸에 이메일을 넣거나
-            「이메일로 찾기」로 멤버 ID를 채웁니다.
+            {me.email} · {ROLE_LABEL[me.role]}. 역할은 본부장 · 팀장 · 팀원입니다. 본부장은 슈퍼관리자와 같이
+            권한 화면을 열고, 부하·일정승인은 자기 본부만 봅니다. 팀장은 같은 본부 일정을 승인합니다. 팀원은 본인
+            부하만 봅니다. 업무 이름은 노션 담당자와 같게 넣으세요.
           </p>
         </div>
         <div className="controls">
@@ -201,8 +267,18 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
       </header>
       {error ? <p className="auth-error">{error}</p> : null}
 
+      <OrgTreeAdmin
+        me={me}
+        units={units}
+        users={users}
+        busy={busy}
+        onCreate={createUnit}
+        onRename={renameUnit}
+        onDelete={deleteUnit}
+      />
+
       <div className="panel">
-        <h2>가입 계정 · {users.length}명</h2>
+        <h2>가입 계정 · {visibleUsers.length}명</h2>
         <div className="table-wrap">
           <table className="tasks">
             <thead>
@@ -211,6 +287,8 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                 <th>이름</th>
                 <th>업무 이름</th>
                 <th>역할</th>
+                <th>본부</th>
+                <th>팀</th>
                 <th>Slack 멤버 ID</th>
                 <th>부하 대시보드</th>
                 <th>성과 페이지</th>
@@ -218,7 +296,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
               </tr>
             </thead>
             <tbody>
-              {users.map((user) => (
+              {visibleUsers.map((user) => (
                 <tr key={user.uid}>
                   <td>{user.email}</td>
                   <td>{user.displayName || "—"}</td>
@@ -239,15 +317,71 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                   <td>
                     {user.isSuperAdmin ? (
                       ROLE_LABEL.superAdmin
+                    ) : user.role === "director" && !canAssignRole(me, "director") ? (
+                      ROLE_LABEL.director
                     ) : (
                       <select
                         className="cell-input"
-                        value={user.role === "lead" ? "lead" : "member"}
+                        value={user.role === "director" || user.role === "lead" ? user.role : "member"}
                         disabled={busy === user.uid}
-                        onChange={(e) => void save(user, { role: e.target.value as OrgRole })}
+                        onChange={(e) => {
+                          const role = e.target.value as OrgRole;
+                          void save(user, {
+                            role,
+                            teamId: role === "director" ? "" : user.teamId,
+                          });
+                        }}
                       >
+                        {canAssignRole(me, "director") ? (
+                          <option value="director">{ROLE_LABEL.director}</option>
+                        ) : null}
                         <option value="lead">{ROLE_LABEL.lead}</option>
                         <option value="member">{ROLE_LABEL.member}</option>
+                      </select>
+                    )}
+                  </td>
+                  <td>
+                    {user.isSuperAdmin ? (
+                      "—"
+                    ) : (
+                      <select
+                        className="cell-input"
+                        value={user.divisionId}
+                        disabled={busy === user.uid || (!me.isSuperAdmin && Boolean(me.divisionId))}
+                        onChange={(e) =>
+                          void save(user, { divisionId: e.target.value, teamId: "" })
+                        }
+                      >
+                        {me.isSuperAdmin || !user.divisionId ? (
+                          <option value="">(미배정)</option>
+                        ) : null}
+                        {(me.isSuperAdmin
+                          ? divisionOptions
+                          : divisionOptions.filter((unit) => unit.id === me.divisionId)
+                        ).map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+                  </td>
+                  <td>
+                    {user.isSuperAdmin || user.role === "director" ? (
+                      "—"
+                    ) : (
+                      <select
+                        className="cell-input"
+                        value={user.teamId}
+                        disabled={busy === user.uid || !user.divisionId}
+                        onChange={(e) => void save(user, { teamId: e.target.value })}
+                      >
+                        <option value="">(미배정)</option>
+                        {teamsOf(units, user.divisionId).map((unit) => (
+                          <option key={unit.id} value={unit.id}>
+                            {unit.name}
+                          </option>
+                        ))}
                       </select>
                     )}
                   </td>
@@ -280,7 +414,12 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       <input
                         type="checkbox"
                         checked={user.canDashboard}
-                        disabled={user.isSuperAdmin || user.role === "lead" || busy === user.uid}
+                        disabled={
+                          user.isSuperAdmin ||
+                          user.role === "lead" ||
+                          user.role === "director" ||
+                          busy === user.uid
+                        }
                         onChange={(e) => void save(user, { canDashboard: e.target.checked })}
                       />
                       허용
@@ -291,7 +430,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                       <input
                         type="checkbox"
                         checked={user.canPerformance}
-                        disabled={user.isSuperAdmin || busy === user.uid}
+                        disabled={user.isSuperAdmin || user.role === "director" || busy === user.uid}
                         onChange={(e) => void save(user, { canPerformance: e.target.checked })}
                       />
                       허용
@@ -306,7 +445,7 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
               ))}
             </tbody>
           </table>
-          {users.length === 0 ? <p className="empty">아직 로그인한 구성원이 없습니다.</p> : null}
+          {visibleUsers.length === 0 ? <p className="empty">아직 로그인한 구성원이 없습니다.</p> : null}
         </div>
       </div>
 

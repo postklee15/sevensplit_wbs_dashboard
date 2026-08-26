@@ -2,14 +2,17 @@ export const SUPER_ADMIN_EMAILS = ["shlim@sevensplit.com"] as const;
 
 export type PageKey = "dashboard" | "performance";
 
-/** 슈퍼관리자는 이메일로 고정. 나머지 계정은 Firestore `role`. */
-export type OrgRole = "superAdmin" | "lead" | "member";
+/** 이메일 슈퍼관리자는 고정. 나머지는 Firestore `role`. */
+export type OrgRole = "superAdmin" | "director" | "lead" | "member";
 
 export const ROLE_LABEL: Record<OrgRole, string> = {
   superAdmin: "슈퍼관리자",
+  director: "본부장",
   lead: "팀장",
   member: "팀원",
 };
+
+export const ASSIGNABLE_ROLES: OrgRole[] = ["director", "lead", "member"];
 
 export type AccessProfile = {
   uid: string;
@@ -23,9 +26,18 @@ export type AccessProfile = {
   slackMemberId: string;
   role: OrgRole;
   isSuperAdmin: boolean;
+  /** 본부 `orgUnits` id. 본부장·팀장·팀원 소속. */
+  divisionId: string;
+  /** 팀 `orgUnits` id. 본부장은 비움. */
+  teamId: string;
   createdAt: string | null;
   lastSeenAt: string | null;
 };
+
+export type WbsAccessScope =
+  | { kind: "company" }
+  | { kind: "division"; workNames: Set<string> }
+  | { kind: "self"; workNames: Set<string> };
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
@@ -38,47 +50,124 @@ export function isSuperAdminEmail(email: string | null | undefined): boolean {
 
 export function parseRole(raw: string, isSuper: boolean): OrgRole {
   if (isSuper) return "superAdmin";
+  if (raw === "director") return "director";
   if (raw === "lead") return "lead";
   return "member";
 }
 
 export function applySuperAdmin(profile: AccessProfile): AccessProfile {
   if (!profile.isSuperAdmin) return profile;
-  return { ...profile, role: "superAdmin", canDashboard: true, canPerformance: true };
+  return {
+    ...profile,
+    role: "superAdmin",
+    canDashboard: true,
+    canPerformance: true,
+  };
+}
+
+export function applyDirectorDefaults(profile: AccessProfile): AccessProfile {
+  const resolved = applySuperAdmin(profile);
+  if (resolved.role !== "director") return resolved;
+  return { ...resolved, canDashboard: true, canPerformance: true };
 }
 
 export function canOpenPage(profile: AccessProfile, page: PageKey): boolean {
-  const resolved = applySuperAdmin(profile);
+  const resolved = applyDirectorDefaults(profile);
   if (page === "dashboard") return resolved.canDashboard;
   return resolved.canPerformance;
 }
 
-/** 슈퍼관리자·팀장은 부하에서 전 인원을 본다. 팀원은 본인만. */
-export function canViewAllLoad(profile: AccessProfile): boolean {
-  const role = applySuperAdmin(profile).role;
-  return role === "superAdmin" || role === "lead";
+/** 권한·조직 화면. 이메일 슈퍼관리자·본부장. */
+export function canManageAccess(profile: AccessProfile): boolean {
+  const resolved = applyDirectorDefaults(profile);
+  return resolved.isSuperAdmin || resolved.role === "director";
 }
 
-/** 슈퍼관리자·팀장은 모든 작업. 팀원은 workName이 담당자와 완전 일치할 때만. */
-export function canEditWbsTask(profile: AccessProfile, assignees: string[]): boolean {
-  const resolved = applySuperAdmin(profile);
-  if (resolved.role === "superAdmin" || resolved.role === "lead") return true;
+/** 본부 단위로 타인 부하를 본다. 팀원은 본인만. 본부 미배정이면 본인만. */
+export function canViewAllLoad(profile: AccessProfile): boolean {
+  const resolved = applyDirectorDefaults(profile);
+  if (resolved.role === "superAdmin") return true;
+  if (resolved.role === "director" || resolved.role === "lead") return Boolean(resolved.divisionId);
+  return false;
+}
+
+export function wbsScopeFromMembers(profile: AccessProfile, members: AccessProfile[]): WbsAccessScope {
+  const resolved = applyDirectorDefaults(profile);
+  if (resolved.role === "superAdmin") return { kind: "company" };
+  if ((resolved.role === "director" || resolved.role === "lead") && resolved.divisionId) {
+    const names = new Set<string>();
+    const own = resolved.workName.trim();
+    if (own) names.add(own);
+    for (const member of members) {
+      if (member.divisionId !== resolved.divisionId) continue;
+      const name = member.workName.trim();
+      if (name) names.add(name);
+    }
+    return { kind: "division", workNames: names };
+  }
+  const self = resolved.workName.trim();
+  return { kind: "self", workNames: new Set(self ? [self] : []) };
+}
+
+export function assigneesInScope(assignees: string[], scope: WbsAccessScope): boolean {
+  if (scope.kind === "company") return true;
+  if (assignees.length === 0) return scope.kind === "division";
+  return assignees.some((name) => scope.workNames.has(name));
+}
+
+/** 서버는 scope를 넘긴다. 클라이언트는 생략하고 역할만 본다. */
+export function canEditWbsTask(
+  profile: AccessProfile,
+  assignees: string[],
+  scope?: WbsAccessScope,
+): boolean {
+  const resolved = applyDirectorDefaults(profile);
+  if (scope) {
+    if (scope.kind === "self") {
+      const workName = resolved.workName.trim();
+      if (!workName) return false;
+      return assignees.some((name) => name === workName);
+    }
+    return assigneesInScope(assignees, scope);
+  }
+  if (resolved.role === "superAdmin" || resolved.role === "director" || resolved.role === "lead") {
+    return true;
+  }
   const workName = resolved.workName.trim();
   if (!workName) return false;
   return assignees.some((name) => name === workName);
 }
 
-/** 슈퍼관리자·팀장만 최상위 지연을 하위에 일괄 적용. */
-export function canCascadeWbsDelay(profile: AccessProfile): boolean {
+export function canCascadeWbsDelay(profile: AccessProfile, scope?: WbsAccessScope): boolean {
+  if (scope) return scope.kind === "company" || scope.kind === "division";
   return canViewAllLoad(profile);
 }
 
-/** 상세 조회. 팀장은 전체, 팀원은 본인 담당. 성과 권한이면 완료 목록 상세를 위해 허용. */
-export function canReadWbsTask(profile: AccessProfile, assignees: string[]): boolean {
-  const resolved = applySuperAdmin(profile);
+export function canReadWbsTask(
+  profile: AccessProfile,
+  assignees: string[],
+  scope?: WbsAccessScope,
+): boolean {
+  const resolved = applyDirectorDefaults(profile);
   if (!canOpenPage(resolved, "dashboard") && !canOpenPage(resolved, "performance")) {
     return false;
   }
-  if (canViewAllLoad(resolved) || canOpenPage(resolved, "performance")) return true;
-  return canEditWbsTask(resolved, assignees);
+  if (canOpenPage(resolved, "performance") && !scope) return true;
+  return canEditWbsTask(resolved, assignees, scope);
+}
+
+export function canAssignRole(actor: AccessProfile, role: OrgRole): boolean {
+  const resolved = applyDirectorDefaults(actor);
+  if (role === "superAdmin") return false;
+  if (resolved.isSuperAdmin) return role === "director" || role === "lead" || role === "member";
+  if (resolved.role === "director") return role === "lead" || role === "member";
+  return false;
+}
+
+/** 권한 화면 목록. 슈퍼관리자는 전원, 본부장은 미배정+자기 본부. */
+export function profilesVisibleTo(actor: AccessProfile, users: AccessProfile[]): AccessProfile[] {
+  const resolved = applyDirectorDefaults(actor);
+  if (resolved.isSuperAdmin) return users;
+  const home = resolved.divisionId;
+  return users.filter((user) => !user.divisionId || user.divisionId === home);
 }

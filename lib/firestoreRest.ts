@@ -106,3 +106,45 @@ export async function patchDocument(
   }
   return (await res.json()) as FirestoreDocument;
 }
+
+function toFirestoreFields(fields: Record<string, string | boolean>): Record<string, FirestoreValue> {
+  const firestoreFields: Record<string, FirestoreValue> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    firestoreFields[key] = typeof value === "boolean" ? { booleanValue: value } : { stringValue: value };
+  }
+  return firestoreFields;
+}
+
+export async function createDocument(
+  token: string,
+  collection: string,
+  id: string,
+  fields: Record<string, string | boolean>,
+): Promise<FirestoreDocument> {
+  const res = await fetch(withKey(`${BASE}/${collection}?documentId=${encodeDocId(id)}`), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ fields: toFirestoreFields(fields) }),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore CREATE ${res.status}: ${text.slice(0, 400)}`);
+  }
+  return (await res.json()) as FirestoreDocument;
+}
+
+export async function deleteDocument(token: string, collection: string, id: string): Promise<void> {
+  const res = await fetch(withKey(`${BASE}/${collection}/${encodeDocId(id)}`), {
+    method: "DELETE",
+    headers: { Authorization: `Bearer ${token}` },
+    cache: "no-store",
+  });
+  if (res.status === 404) return;
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`Firestore DELETE ${res.status}: ${text.slice(0, 400)}`);
+  }
+}

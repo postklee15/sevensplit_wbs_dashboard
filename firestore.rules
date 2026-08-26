@@ -1,26 +1,13 @@
 rules_version = '2';
 
-// ===============================================================
-// Assumed Data Model
-// ===============================================================
-//
-// Collection: users
-// Document ID: Firebase Auth UID
-// Fields:
-//   email (string, required) — @sevensplit.com
-//   displayName (string, required) — Google 표시 이름. 하트비트가 갱신
-//   workName (string, optional) — 노션 담당자 이름. 본인이 프로필에서 설정
-//   canDashboard (bool, required)
-//   canPerformance (bool, required)
-//   slackMemberId (string, optional) — Slack U… ID. 하트비트가 덮지 않음
-//   role (string, optional) — lead | member. 슈퍼관리자는 이메일로 고정. 없으면 팀원
-//   createdAt (string ISO, required on create)
-//   lastSeenAt (string ISO, required)
-// Collection: projectPms — 서비스 → PM uid (슈퍼관리자만)
-// Collection: alertLogs — 하루 1통 로그 (슈퍼관리자만)
-// Super admin emails are hardcoded in rules; role flags from the client
-// cannot grant super admin.
-//
+// Collection: users — Firebase Auth UID
+//   email, displayName, workName, canDashboard, canPerformance,
+//   slackMemberId, role (director|lead|member|superAdmin),
+//   divisionId, teamId, createdAt, lastSeenAt
+// Collection: orgUnits — 본부(division) / 팀(team)
+// Collection: projectPms, alertLogs — 슈퍼관리자·본부장
+// 이메일 슈퍼관리자 shlim@sevensplit.com 은 고정. 본부장은 role=director.
+
 service cloud.firestore {
   match /databases/{database}/documents {
     function signedIn() {
@@ -35,6 +22,25 @@ service cloud.firestore {
       return signedIn()
         && request.auth.token.email is string
         && request.auth.token.email.lower() == 'shlim@sevensplit.com';
+    }
+
+    function isDirector() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('role', '') == 'director';
+    }
+
+    function canManageAccess() {
+      return isSuperAdmin() || isDirector();
+    }
+
+    function actorDivisionId() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.get('divisionId', '');
+    }
+
+    function targetIsBootstrapAdmin() {
+      return resource.data.email is string
+        && resource.data.email.lower() == 'shlim@sevensplit.com';
     }
 
     function hasUserKeys(data) {
@@ -64,12 +70,31 @@ service cloud.firestore {
         && (!('slackMemberId' in data)
           || (data.slackMemberId is string && data.slackMemberId.size() < 32))
         && (!('role' in data)
-          || (data.role is string && data.role in ['lead', 'member', 'superAdmin']));
+          || (data.role is string && data.role in ['lead', 'member', 'director', 'superAdmin']))
+        && (!('divisionId' in data)
+          || (data.divisionId is string && data.divisionId.size() < 80))
+        && (!('teamId' in data)
+          || (data.teamId is string && data.teamId.size() < 80));
+    }
+
+    function directorKeepsOrSetsHome(data) {
+      return actorDivisionId() != ''
+        && (
+          resource.data.get('divisionId', '') == ''
+          || resource.data.get('divisionId', '') == actorDivisionId()
+        )
+        && data.get('divisionId', '') == actorDivisionId();
+    }
+
+    function directorRolePatchOk(data) {
+      return resource.data.get('role', 'member') == 'director'
+        ? data.role == 'director'
+        : data.role in ['lead', 'member'];
     }
 
     match /users/{uid} {
-      allow get: if isSelf(uid) || isSuperAdmin();
-      allow list: if isSuperAdmin();
+      allow get: if isSelf(uid) || canManageAccess();
+      allow list: if signedIn();
       allow create: if isSelf(uid)
         && isValidUser(request.resource.data)
         && request.resource.data.email.lower() == request.auth.token.email.lower()
@@ -77,7 +102,9 @@ service cloud.firestore {
         && request.resource.data.canPerformance == (
           request.auth.token.email.lower() == 'shlim@sevensplit.com'
         )
-        && request.resource.data.get('role', 'member') == 'member';
+        && request.resource.data.get('role', 'member') == 'member'
+        && request.resource.data.get('divisionId', '') == ''
+        && request.resource.data.get('teamId', '') == '';
       allow update: if isValidUser(request.resource.data)
         && (
           (
@@ -88,9 +115,19 @@ service cloud.firestore {
             && request.resource.data.createdAt == resource.data.createdAt
             && request.resource.data.get('slackMemberId', '') == resource.data.get('slackMemberId', '')
             && request.resource.data.get('role', '') == resource.data.get('role', '')
+            && request.resource.data.get('divisionId', '') == resource.data.get('divisionId', '')
+            && request.resource.data.get('teamId', '') == resource.data.get('teamId', '')
           )
           || (
             isSuperAdmin()
+            && request.resource.data.email == resource.data.email
+            && request.resource.data.createdAt == resource.data.createdAt
+          )
+          || (
+            isDirector()
+            && !targetIsBootstrapAdmin()
+            && directorKeepsOrSetsHome(request.resource.data)
+            && directorRolePatchOk(request.resource.data)
             && request.resource.data.email == resource.data.email
             && request.resource.data.createdAt == resource.data.createdAt
           )
@@ -98,12 +135,41 @@ service cloud.firestore {
       allow delete: if false;
     }
 
+    match /orgUnits/{id} {
+      allow read: if signedIn();
+      allow create: if isSuperAdmin()
+        || (
+          isDirector()
+          && actorDivisionId() != ''
+          && request.resource.data.kind == 'team'
+          && request.resource.data.parentId == actorDivisionId()
+        );
+      allow update: if isSuperAdmin()
+        || (
+          isDirector()
+          && actorDivisionId() != ''
+          && request.resource.data.kind == resource.data.kind
+          && request.resource.data.parentId == resource.data.parentId
+          && (
+            (resource.data.kind == 'division' && id == actorDivisionId())
+            || (resource.data.kind == 'team' && resource.data.parentId == actorDivisionId())
+          )
+        );
+      allow delete: if isSuperAdmin()
+        || (
+          isDirector()
+          && actorDivisionId() != ''
+          && resource.data.kind == 'team'
+          && resource.data.parentId == actorDivisionId()
+        );
+    }
+
     match /projectPms/{id} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if canManageAccess();
     }
 
     match /alertLogs/{id} {
-      allow read, write: if isSuperAdmin();
+      allow read, write: if canManageAccess();
     }
   }
 }

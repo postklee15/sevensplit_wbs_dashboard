@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
-import { isSuperAdminEmail } from "@/lib/acl";
+import { canManageAccess } from "@/lib/acl";
 import { jsonAuthError, requireSevensplitUser } from "@/lib/adminAuth";
+import { heartbeatUser } from "@/lib/aclStore";
 import { listProjectPms, upsertProjectPm } from "@/lib/alertStore";
 import { NO_SERVICE, servicesOf } from "@/lib/metrics";
 import { fetchWbsTasks } from "@/lib/notion";
@@ -10,20 +11,30 @@ export const dynamic = "force-dynamic";
 
 function forbid() {
   return NextResponse.json(
-    { error: "슈퍼 관리자만 알림을 설정할 수 있습니다.", reason: "forbidden_page" },
+    { error: "본부장 또는 슈퍼관리자만 알림을 설정할 수 있습니다.", reason: "forbidden_page" },
     { status: 403 },
   );
 }
 
-export async function GET(request: Request) {
+async function requireManager(request: Request) {
   const auth = await requireSevensplitUser(request);
-  if ("reason" in auth) {
-    return NextResponse.json(jsonAuthError(auth), { status: auth.status });
-  }
-  if (!isSuperAdminEmail(auth.email)) return forbid();
+  if ("reason" in auth) return { error: NextResponse.json(jsonAuthError(auth), { status: auth.status }) };
+  const profile = await heartbeatUser({
+    token: auth.token,
+    uid: auth.uid,
+    email: auth.email,
+    displayName: auth.name || auth.email,
+  });
+  if (!canManageAccess(profile)) return { error: forbid() };
+  return { auth };
+}
+
+export async function GET(request: Request) {
+  const loaded = await requireManager(request);
+  if ("error" in loaded) return loaded.error;
 
   try {
-    const pms = await listProjectPms(auth.token);
+    const pms = await listProjectPms(loaded.auth.token);
     const services = new Set(pms.map((row) => row.service));
     try {
       const { tasks } = await fetchWbsTasks();
@@ -43,11 +54,8 @@ export async function GET(request: Request) {
 }
 
 export async function PUT(request: Request) {
-  const auth = await requireSevensplitUser(request);
-  if ("reason" in auth) {
-    return NextResponse.json(jsonAuthError(auth), { status: auth.status });
-  }
-  if (!isSuperAdminEmail(auth.email)) return forbid();
+  const loaded = await requireManager(request);
+  if ("error" in loaded) return loaded.error;
 
   const body = (await request.json()) as { service?: string; pmUid?: string };
   if (!body.service?.trim()) {
@@ -56,9 +64,9 @@ export async function PUT(request: Request) {
 
   try {
     const pm = await upsertProjectPm(
-      auth.token,
+      loaded.auth.token,
       { service: body.service, pmUid: body.pmUid ?? "" },
-      auth.email,
+      loaded.auth.email,
     );
     return NextResponse.json({ pm });
   } catch (error) {

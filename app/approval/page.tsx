@@ -11,7 +11,7 @@ export default function ApprovalPage() {
         <ProfileGate user={user}>
           {({ profile, token }) =>
             profile.canDashboard ? (
-              <ApprovalBoard token={token} />
+              <ApprovalBoard token={token} profile={profile} />
             ) : (
               <main className="auth-page">
                 <p className="kicker">Sevensplit WBS</p>
