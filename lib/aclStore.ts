@@ -1,8 +1,11 @@
 import {
   applyDirectorDefaults,
   isSuperAdminEmail,
+  isTestLoginEmail,
+  TEST_LOGIN_UID,
   normalizeEmail,
   parseRole,
+  testReviewerProfile,
   type AccessProfile,
   type OrgRole,
 } from "./acl";
@@ -42,6 +45,12 @@ export async function heartbeatUser(opts: {
   email: string;
   displayName: string;
 }): Promise<AccessProfile> {
+  if (isTestLoginEmail(opts.email)) {
+    return testReviewerProfile({
+      displayName: opts.displayName.trim() || "WBS 테스트",
+      lastSeenAt: new Date().toISOString(),
+    });
+  }
   const now = new Date().toISOString();
   const existing = await getDocument(opts.token, COLLECTION, opts.uid);
   const email = normalizeEmail(opts.email);
@@ -214,6 +223,9 @@ export async function updateWorkName(
   uid: string,
   workName: string,
 ): Promise<AccessProfile> {
+  if (uid === TEST_LOGIN_UID) {
+    return testReviewerProfile({ workName: normalizeWorkName(workName) });
+  }
   const existing = await getDocument(token, COLLECTION, uid);
   if (!existing) {
     throw new Error("프로필이 없습니다. 한 번 로그아웃 후 다시 로그인해 주세요.");

@@ -14,8 +14,11 @@ jobs:
       NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
       NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
       SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+      WBS_TEST_PASSWORD: ${{ secrets.WBS_TEST_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -23,10 +26,11 @@ jobs:
       - run: npm ci
       - name: Write production env
         run: |
-          printf 'NOTION_TOKEN=%s\nNOTION_DATABASE_ID=%s\nSLACK_BOT_TOKEN=%s\n' \
+          printf 'NOTION_TOKEN=%s\nNOTION_DATABASE_ID=%s\nSLACK_BOT_TOKEN=%s\nWBS_TEST_PASSWORD=%s\n' \
             "$NOTION_TOKEN" \
             "${NOTION_DATABASE_ID:-37c1559b-095a-80f1-af80-e0be81606fe9}" \
             "$SLACK_BOT_TOKEN" \
+            "$WBS_TEST_PASSWORD" \
             > .env.sevensplit-wbs-dashboard
       - uses: google-github-actions/auth@v2
         with:

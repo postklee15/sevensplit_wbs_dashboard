@@ -20,7 +20,7 @@ export function ChangeLogBoard() {
           <p className="kicker">Split Invest · WBS</p>
           <h1>변경 기록</h1>
           <p className="sub">
-            대시보드에 반영된 기능을 날짜별로 모았습니다. {CHANGELOG.length}일 · {totalEntries}건.
+            커밋이 올라오면 날짜별로 자동 반영됩니다. {CHANGELOG.length}일 · {totalEntries}건.
             칩으로 하루만 고를 수 있습니다.
           </p>
         </div>
@@ -58,10 +58,10 @@ export function ChangeLogBoard() {
           >
             <h2 id={`changelog-${day.date}`}>{formatChangelogDate(day.date)}</h2>
             <ul className="changelog-list">
-              {day.entries.map((entry) => (
-                <li key={entry.title} className="changelog-item">
+              {day.entries.map((entry, index) => (
+                <li key={`${day.date}-${index}-${entry.title}`} className="changelog-item">
                   <h3>{entry.title}</h3>
-                  <p>{entry.body}</p>
+                  {entry.body ? <p>{entry.body}</p> : null}
                 </li>
               ))}
             </ul>

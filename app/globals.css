@@ -826,6 +826,14 @@ table.tasks tbody.task-family tr.task-family-child.unassigned-task td {
   align-items: center;
 }
 
+.auth-page .test-login {
+  margin-top: 28px;
+}
+
+.auth-page .test-login .kicker {
+  margin-bottom: 4px;
+}
+
 .site-nav {
   display: flex;
   justify-content: space-between;

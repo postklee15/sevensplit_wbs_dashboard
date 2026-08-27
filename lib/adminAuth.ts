@@ -1,5 +1,6 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 import { isAllowedEmail } from "./allowedEmail";
+import { verifyTestToken } from "./testAuth";
 
 export type AuthFailure = {
   status: 401 | 403;
@@ -46,6 +47,9 @@ export async function requireSevensplitUser(
       error: "로그인 토큰이 전달되지 않았습니다. 다시 로그인해 주세요.",
     };
   }
+
+  const testUser = await verifyTestToken(token);
+  if (testUser) return testUser;
 
   try {
     const { payload } = await jwtVerify(token, JWKS, {

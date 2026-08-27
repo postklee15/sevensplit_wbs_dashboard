@@ -22,7 +22,7 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 | 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같음. **본부 단위로 격리**. 팀원 API는 본인 작업만 |
 | 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자·본부장 또는 허용된 계정 |
 | 권한 `/admin/access` | 조직 트리·역할(본부장/팀장/팀원)·페이지 권한 | **슈퍼관리자·본부장** (`shlim@sevensplit.com`은 전사) |
-| 변경 기록 `/changelog` | 배포된 기능을 날짜 칩으로 보기. 데이터는 `lib/changelog.ts` | 로그인한 `@sevensplit.com` |
+| 변경 기록 `/changelog` | 배포된 기능을 날짜 칩으로 보기. git log를 빌드 때 묶음 | 로그인한 `@sevensplit.com` 또는 테스트 계정 |
 | 프로필 `/profile` | 내 업무에 쓸 노션 담당자 이름(`workName`) | 로그인한 `@sevensplit.com` |
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김. 칩으로 **최상위만** · **전체**. 목록은 **최상위 트리로 묶고**, 최상위 행이 없으면 제목 줄을 둔다. 최상위 행·상세·달력 라벨에 **최상위** 배지. 부하 KPI는 최상위만 골라도 하위 공수 기준.
@@ -98,7 +98,7 @@ npm run dev   # next dev --turbopack
   JSON { fetchedAt, databaseTitle, tasks }
 클라이언트
   Dashboard / WbsCalendar / PerformanceBoard
-  ChangeLogBoard (날짜별, `lib/changelog.ts`)
+  ChangeLogBoard (`lib/changelog.generated.ts`, 빌드 때 git log)
   AccessAdmin (슈퍼관리자·본부장. 조직 트리)
   ProfileGate → POST /api/me (Firestore users/{uid})
 ```
@@ -112,7 +112,11 @@ npm run dev   # next dev --turbopack
 | `app/profile/page.tsx` | 노션 담당자 이름 저장 |
 | `app/changelog/page.tsx` | 변경 기록. 로그인만 있으면 됨 |
 | `components/ChangeLogBoard.tsx` | 날짜 칩(전체 + 하루)과 항목 목록 |
-| `lib/changelog.ts` | 날짜별 변경 기록. SHA·시크릿 없음 |
+| `lib/changelog.ts` | 날짜 포맷·필터 |
+| `lib/changelog.generated.ts` | `scripts/generate-changelog.mjs`가 git log로 생성. 직접 고치지 말 것 |
+| `scripts/changelog-overrides.json` | 예전 영문 커밋 제목 → 한글. 새 커밋은 `Changelog:` 꼬리말 |
+| `app/api/test-login/route.ts` | 테스트 계정 JWT. `WBS_TEST_PASSWORD`가 있을 때만 |
+| `lib/testAuth.ts` | 테스트 JWT 발급·검증. firebase-admin 없음 |
 | `components/MyWorkBoard.tsx` | 내 업무 목록·월력·주력 + 프로필 폼 |
 | `app/api/me/route.ts` | `POST` 하트비트, `PATCH` `workName` |
 | `components/AuthGate.tsx` | Google 로그인 게이트 |
@@ -285,7 +289,8 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 6. 용량 5인일·평일만 배분·주말 제외는 제품 가정입니다. 바꾸려면 `WEEKLY_CAPACITY`와 `buildPersonRows`를 보면 됩니다.
 7. 업무 상세 저장은 `PATCH /api/wbs/[id]`. 같은 본부 범위의 본부장·팀장·슈퍼관리자, 팀원은 `workName`이 담당자와 완전 일치할 때만. 인테그레이션에 DB 편집 권한이 필요하다.
 8. 최상위 작업을 지연으로 저장할 때 본부장·팀장·슈퍼관리자는 `cascadeDelay`로 하위 전체에 추가 일정·지연사유·일정승인(지연)을 복사한다. 하위가 많으면 일부만 적용될 수 있어 다시 저장한다.
-9. 사용자에게 보이는 기능이 바뀌면 `lib/changelog.ts`에 그날(KST) 항목을 추가한다. SHA·시크릿은 넣지 않는다.
+9. 사용자에게 보이는 기능이 바뀌면 커밋 본문에 `Changelog:` / `Changelog-Body:` 꼬리말을 넣는다. 빌드가 git log로 `/changelog`를 다시 만든다. SHA·시크릿은 넣지 않는다.
+10. 테스트 계정은 `wbs-test@sevensplit.com`. 비밀번호는 gitignored `.env`의 `WBS_TEST_PASSWORD`. Firebase 이메일 로그인은 켜지 않는다(CD `--only auth` 금지). 라이브는 GitHub Secret `WBS_TEST_PASSWORD`가 있어야 로그인 칸이 나온다.
 
 ---
 
@@ -295,6 +300,8 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 - `/api/wbs`, `/api/wbs/schema`, `/api/wbs/[id]`를 인증 없이 열지 말 것.
 - 쿠키 이름을 다시 `__session`으로 되돌리지 말 것 (ID 토큰 ≠ Firebase session cookie).
 - `firebase-admin`으로 검증을 되돌리지 말 것 (Cloud Function에서 이미 실패).
+- `WBS_TEST_PASSWORD`를 git·볼트·커밋된 env 파일에 넣지 말 것.
+- CD에 `--only auth`를 다시 넣지 말 것.
 - `main` force push, `--no-verify` 커밋 금지 (사용자 규칙).
 - 배포 시 `--force`는 webframeworks가 요구해서 수동 배포에 썼음. CD workflow에도 `--force`가 있음.
 

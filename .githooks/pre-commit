@@ -1,0 +1,4 @@
+#!/bin/sh
+# 커밋 스냅샷에 최신 git log 변경 기록을 넣는다. 이번 커밋 제목은 CD/prebuild가 포함한다.
+node scripts/generate-changelog.mjs
+git add lib/changelog.generated.ts

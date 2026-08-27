@@ -1,5 +1,9 @@
 export const SUPER_ADMIN_EMAILS = ["shlim@sevensplit.com"] as const;
 
+/** Firebase 이메일 로그인이 꺼져 있어 앱이 발급한 테스트 JWT. 비밀번호는 env `WBS_TEST_PASSWORD`. */
+export const TEST_LOGIN_EMAIL = "wbs-test@sevensplit.com";
+export const TEST_LOGIN_UID = "wbs-test";
+
 export type PageKey = "dashboard" | "performance";
 
 /** 이메일 슈퍼관리자는 고정. 나머지는 Firestore `role`. */
@@ -41,6 +45,30 @@ export type WbsAccessScope =
 
 export function normalizeEmail(email: string): string {
   return email.trim().toLowerCase();
+}
+
+export function isTestLoginEmail(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return normalizeEmail(email) === TEST_LOGIN_EMAIL;
+}
+
+export function testReviewerProfile(partial?: Partial<AccessProfile>): AccessProfile {
+  const now = new Date().toISOString();
+  return {
+    uid: TEST_LOGIN_UID,
+    email: TEST_LOGIN_EMAIL,
+    displayName: partial?.displayName?.trim() || "WBS 테스트",
+    workName: partial?.workName?.trim() || "WBS테스트",
+    canDashboard: true,
+    canPerformance: true,
+    slackMemberId: "",
+    role: "lead",
+    isSuperAdmin: false,
+    divisionId: "",
+    teamId: "",
+    createdAt: partial?.createdAt ?? "2026-08-27T00:00:00.000Z",
+    lastSeenAt: partial?.lastSeenAt ?? now,
+  };
 }
 
 export function isSuperAdminEmail(email: string | null | undefined): boolean {

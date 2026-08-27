@@ -8,6 +8,7 @@ import type { AccessProfile } from "@/lib/acl";
 import { canManageAccess, ROLE_LABEL } from "@/lib/acl";
 import { auth } from "@/lib/firebase";
 import { clearSessionCookie } from "@/lib/sessionCookie";
+import { clearTestToken } from "@/lib/testSession";
 
 export function SiteNav({
   profile,
@@ -60,8 +61,11 @@ export function SiteNav({
           className="chip"
           type="button"
           onClick={() => {
+            clearTestToken();
             clearSessionCookie();
-            void signOut(auth);
+            void signOut(auth).finally(() => {
+              window.location.assign("/");
+            });
           }}
         >
           로그아웃
