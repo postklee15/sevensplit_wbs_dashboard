@@ -22,6 +22,7 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 | 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같음. **본부 단위로 격리**. 팀원 API는 본인 작업만 |
 | 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자·본부장 또는 허용된 계정 |
 | 권한 `/admin/access` | 조직 트리·역할(본부장/팀장/팀원)·페이지 권한 | **슈퍼관리자·본부장** (`shlim@sevensplit.com`은 전사) |
+| 변경 기록 `/changelog` | 배포된 기능을 날짜 칩으로 보기. 데이터는 `lib/changelog.ts` | 로그인한 `@sevensplit.com` |
 | 프로필 `/profile` | 내 업무에 쓸 노션 담당자 이름(`workName`) | 로그인한 `@sevensplit.com` |
 
 기본 필터: **하위(리프) 작업만**, 완료 숨김. 칩으로 **최상위만** · **전체**. 목록은 **최상위 트리로 묶고**, 최상위 행이 없으면 제목 줄을 둔다. 최상위 행·상세·달력 라벨에 **최상위** 배지. 부하 KPI는 최상위만 골라도 하위 공수 기준.
@@ -97,6 +98,7 @@ npm run dev   # next dev --turbopack
   JSON { fetchedAt, databaseTitle, tasks }
 클라이언트
   Dashboard / WbsCalendar / PerformanceBoard
+  ChangeLogBoard (날짜별, `lib/changelog.ts`)
   AccessAdmin (슈퍼관리자·본부장. 조직 트리)
   ProfileGate → POST /api/me (Firestore users/{uid})
 ```
@@ -108,6 +110,9 @@ npm run dev   # next dev --turbopack
 | `app/page.tsx` | `AuthGate` + `WbsApp` |
 | `app/my/page.tsx` | 내 업무. `workName`과 담당자 완전 일치. 목록·월력·주력 |
 | `app/profile/page.tsx` | 노션 담당자 이름 저장 |
+| `app/changelog/page.tsx` | 변경 기록. 로그인만 있으면 됨 |
+| `components/ChangeLogBoard.tsx` | 날짜 칩(전체 + 하루)과 항목 목록 |
+| `lib/changelog.ts` | 날짜별 변경 기록. SHA·시크릿 없음 |
 | `components/MyWorkBoard.tsx` | 내 업무 목록·월력·주력 + 프로필 폼 |
 | `app/api/me/route.ts` | `POST` 하트비트, `PATCH` `workName` |
 | `components/AuthGate.tsx` | Google 로그인 게이트 |
@@ -280,6 +285,7 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 6. 용량 5인일·평일만 배분·주말 제외는 제품 가정입니다. 바꾸려면 `WEEKLY_CAPACITY`와 `buildPersonRows`를 보면 됩니다.
 7. 업무 상세 저장은 `PATCH /api/wbs/[id]`. 같은 본부 범위의 본부장·팀장·슈퍼관리자, 팀원은 `workName`이 담당자와 완전 일치할 때만. 인테그레이션에 DB 편집 권한이 필요하다.
 8. 최상위 작업을 지연으로 저장할 때 본부장·팀장·슈퍼관리자는 `cascadeDelay`로 하위 전체에 추가 일정·지연사유·일정승인(지연)을 복사한다. 하위가 많으면 일부만 적용될 수 있어 다시 저장한다.
+9. 사용자에게 보이는 기능이 바뀌면 `lib/changelog.ts`에 그날(KST) 항목을 추가한다. SHA·시크릿은 넣지 않는다.
 
 ---
 

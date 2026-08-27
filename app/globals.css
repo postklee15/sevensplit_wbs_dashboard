@@ -1563,3 +1563,43 @@ table.tasks tbody.task-family tr.task-family-child.unassigned-task td {
     grid-template-columns: 1fr;
   }
 }
+
+.changelog-day {
+  margin: 0 0 28px;
+}
+
+.changelog-day h2 {
+  margin: 0 0 12px;
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.changelog-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+}
+
+.changelog-item {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 14px;
+  padding: 14px 16px;
+}
+
+.changelog-item h3 {
+  margin: 0 0 6px;
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+}
+
+.changelog-item p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}

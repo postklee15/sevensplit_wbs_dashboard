@@ -45,6 +45,9 @@ export function SiteNav({
             권한
           </Link>
         ) : null}
+        <Link className={`chip ${pathname === "/changelog" ? "on" : ""}`} href="/changelog">
+          변경 기록
+        </Link>
       </div>
       <span className="account-chip">
         <span className="badge">{ROLE_LABEL[profile.role]}</span>
