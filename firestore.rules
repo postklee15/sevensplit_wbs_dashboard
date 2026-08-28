@@ -5,7 +5,7 @@ rules_version = '2';
 //   slackMemberId, role (director|lead|member|superAdmin),
 //   divisionId, teamId, createdAt, lastSeenAt
 // Collection: orgUnits — 본부(division) / 팀(team)
-// Collection: projectPms, alertLogs — 슈퍼관리자·본부장
+// Collection: projectPms, csOwners, alertLogs — 슈퍼관리자·본부장
 // 이메일 슈퍼관리자 shlim@sevensplit.com 은 고정. 본부장은 role=director.
 
 service cloud.firestore {
@@ -165,6 +165,10 @@ service cloud.firestore {
     }
 
     match /projectPms/{id} {
+      allow read, write: if canManageAccess();
+    }
+
+    match /csOwners/{id} {
       allow read, write: if canManageAccess();
     }
 

@@ -6,10 +6,10 @@ import { ROLE_LABEL, canAssignRole, profilesVisibleTo } from "@/lib/acl";
 import type { OrgUnit } from "@/lib/org";
 import { divisionsOf, teamsOf } from "@/lib/org";
 import { OrgTreeAdmin } from "@/components/OrgTreeAdmin";
-import type { ProjectPm } from "@/lib/alertStore";
+import type { ProjectPm, CsOwner, CsOwnerKind } from "@/lib/alertStore";
 
 type PreviewRow = {
-  kind: "unassigned" | "overdue";
+  kind: "unassigned" | "overdue" | "cs-unresolved";
   recipientUid: string;
   recipientName: string;
   service: string;
@@ -21,6 +21,7 @@ type PreviewRow = {
 type RunResult = {
   dateKst: string;
   dryRun: boolean;
+  weekend?: boolean;
   preview: PreviewRow[];
   sent: number;
   skipped: number;
@@ -30,6 +31,9 @@ type RunResult = {
 const SKIP_LABEL: Record<string, string> = {
   "no-pm": "PM 없음",
   "pm-not-found": "PM 계정 없음",
+  "no-owner": "CS 담당 없음",
+  "owner-not-found": "담당 계정 없음",
+  "empty-team": "팀원 없음",
   "no-slack": "Slack ID 없음",
   "already-sent": "오늘 이미 보냄",
   "no-assignee": "담당자 없음",
@@ -37,10 +41,26 @@ const SKIP_LABEL: Record<string, string> = {
   "dry-run": "미리보기",
   sent: "전송됨",
   "send-failed": "전송 실패",
+  weekend: "주말 건너뜀",
 };
 
 function userLabel(user: AccessProfile): string {
   return user.workName ? `${user.workName} (${user.email})` : user.email;
+}
+
+function teamLabel(units: OrgUnit[], teamId: string): string {
+  const team = units.find((unit) => unit.id === teamId);
+  if (!team) return teamId;
+  const division = units.find((unit) => unit.id === team.parentId);
+  return division ? `${division.name} / ${team.name}` : team.name;
+}
+
+function allTeams(units: OrgUnit[]): OrgUnit[] {
+  const teams: OrgUnit[] = [];
+  for (const division of divisionsOf(units)) {
+    teams.push(...teamsOf(units, division.id));
+  }
+  return teams;
 }
 
 function formatLastSeen(iso: string | null): string {
@@ -65,10 +85,14 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
   const [units, setUnits] = useState<OrgUnit[]>([]);
   const [pms, setPms] = useState<ProjectPm[]>([]);
   const [services, setServices] = useState<string[]>([]);
+  const [csOwners, setCsOwners] = useState<CsOwner[]>([]);
+  const [csServices, setCsServices] = useState<string[]>([]);
   const [preview, setPreview] = useState<RunResult | null>(null);
+  const [csPreview, setCsPreview] = useState<RunResult | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [force, setForce] = useState(false);
+  const [csForce, setCsForce] = useState(false);
 
   const headers = useMemo(
     () => ({ Authorization: `Bearer ${token}`, "Content-Type": "application/json" }),
@@ -97,14 +121,25 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
     setServices(body.services ?? []);
   }, [token]);
 
+  const loadCsOwners = useCallback(async () => {
+    const res = await fetch("/api/alerts/cs-owners", {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+    const body = (await res.json()) as { owners?: CsOwner[]; services?: string[]; error?: string };
+    if (!res.ok) throw new Error(body.error || `CS 담당 조회 실패 (${res.status})`);
+    setCsOwners(body.owners ?? []);
+    setCsServices(body.services ?? []);
+  }, [token]);
+
   const load = useCallback(async () => {
     setError(null);
     try {
-      await Promise.all([loadUsers(), loadPms(), loadOrg()]);
+      await Promise.all([loadUsers(), loadPms(), loadCsOwners(), loadOrg()]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "목록을 불러오지 못했습니다.");
     }
-  }, [loadUsers, loadPms, loadOrg]);
+  }, [loadUsers, loadPms, loadCsOwners, loadOrg]);
 
   useEffect(() => {
     void load();
@@ -204,7 +239,54 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
     }
   }
 
+  async function saveCsOwner(service: string, ownerKind: CsOwnerKind, ownerId: string) {
+    setBusy(`cs:${service}`);
+    setError(null);
+    try {
+      const res = await fetch("/api/alerts/cs-owners", {
+        method: "PUT",
+        headers,
+        body: JSON.stringify({ service, ownerKind, ownerId }),
+      });
+      const body = (await res.json()) as { owner?: CsOwner; error?: string };
+      if (!res.ok || !body.owner) throw new Error(body.error || "CS 담당 저장 실패");
+      setCsOwners((prev) => {
+        const next = prev.filter((row) => row.service !== service);
+        next.push(body.owner!);
+        return next.sort((a, b) => a.service.localeCompare(b.service, "ko"));
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "CS 담당을 저장하지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function runCsAlerts(dryRun: boolean) {
+    setBusy(dryRun ? "cs-preview" : "cs-send");
+    setError(null);
+    try {
+      const res = await fetch("/api/alerts/cs/run", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({ dryRun, force: csForce }),
+      });
+      const body = (await res.json()) as RunResult & { error?: string };
+      if (!res.ok) throw new Error(body.error || "실행 실패");
+      setCsPreview(body);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "CS 알림 작업을 실행하지 못했습니다.");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   const pmByService = useMemo(() => new Map(pms.map((row) => [row.service, row.pmUid])), [pms]);
+  const csOwnerByService = useMemo(
+    () => new Map(csOwners.map((row) => [row.service, row])),
+    [csOwners],
+  );
+  const teamChoices = useMemo(() => allTeams(units), [units]);
   const visibleUsers = useMemo(() => profilesVisibleTo(me, users), [users, me]);
   const divisionOptions = divisionsOf(units);
 
@@ -524,6 +606,79 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
       </div>
 
       <div className="panel">
+        <h2>CS 담당</h2>
+        <p className="sub">
+          서비스마다 담당자 또는 담당 팀을 지정합니다. 미해결 CS가 있으면 평일 11:00 KST에 Slack DM을 보냅니다. 주말에는
+          보내지 않습니다.
+        </p>
+        <div className="table-wrap">
+          <table className="tasks access-pm access-cs">
+            <colgroup>
+              <col className="col-service" />
+              <col className="col-cs-kind" />
+              <col className="col-pm" />
+            </colgroup>
+            <thead>
+              <tr>
+                <th>서비스</th>
+                <th>유형</th>
+                <th>담당</th>
+              </tr>
+            </thead>
+            <tbody>
+              {csServices.map((service) => {
+                const owner = csOwnerByService.get(service);
+                const kind: CsOwnerKind = owner?.ownerKind ?? "user";
+                const ownerId = owner?.ownerId ?? "";
+                return (
+                  <tr key={service}>
+                    <td className="cell-clip">{service}</td>
+                    <td>
+                      <select
+                        className="cell-input"
+                        value={kind}
+                        disabled={busy === `cs:${service}`}
+                        onChange={(e) =>
+                          void saveCsOwner(service, e.target.value as CsOwnerKind, "")
+                        }
+                      >
+                        <option value="user">담당자</option>
+                        <option value="team">담당팀</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        className="cell-input"
+                        value={ownerId}
+                        disabled={busy === `cs:${service}`}
+                        onChange={(e) => void saveCsOwner(service, kind, e.target.value)}
+                      >
+                        <option value="">(없음)</option>
+                        {kind === "team"
+                          ? teamChoices.map((unit) => (
+                              <option key={unit.id} value={unit.id}>
+                                {teamLabel(units, unit.id)}
+                              </option>
+                            ))
+                          : users.map((user) => (
+                              <option key={user.uid} value={user.uid}>
+                                {userLabel(user)}
+                              </option>
+                            ))}
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+          {csServices.length === 0 ? (
+            <p className="empty">표시할 CS 서비스가 없습니다. CS 페이지를 한 번 연 뒤 다시 열어 주세요.</p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="panel">
         <h2>Slack 알림</h2>
         <p className="sub">평일 09:00 KST에 GitHub Actions가 자동 발송합니다. 여기서 미리보기하거나 지금 보낼 수 있습니다.</p>
         <div className="access-actions">
@@ -568,6 +723,69 @@ export function AccessAdmin({ token, me }: { token: string; me: AccessProfile })
                   {preview.preview.map((row, index) => (
                     <tr key={`${row.kind}-${row.recipientUid}-${row.service}-${index}`}>
                       <td>{row.kind === "unassigned" ? "미지정" : "기한초과"}</td>
+                      <td>{row.recipientName || row.recipientUid || "—"}</td>
+                      <td>{row.service}</td>
+                      <td>{row.taskCount}</td>
+                      <td>{SKIP_LABEL[row.skip] ?? row.skip}</td>
+                      <td>{row.sampleTitles.join(", ") || "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        ) : null}
+      </div>
+
+      <div className="panel">
+        <h2>CS Slack 알림</h2>
+        <p className="sub">
+          평일 11:00 KST에 GitHub Actions가 미해결 CS를 담당자에게 보냅니다. 주말에는 보내지 않습니다. 여기서
+          미리보기하거나 지금 보낼 수 있습니다.
+        </p>
+        <div className="access-actions">
+          <label className="toggle">
+            <input type="checkbox" checked={csForce} onChange={(e) => setCsForce(e.target.checked)} />
+            오늘 이미 보낸 것도 다시
+          </label>
+          <button className="btn" type="button" disabled={busy !== null} onClick={() => void runCsAlerts(true)}>
+            {busy === "cs-preview" ? "미리보는 중…" : "미리보기"}
+          </button>
+          <button className="btn" type="button" disabled={busy !== null} onClick={() => void runCsAlerts(false)}>
+            {busy === "cs-send" ? "보내는 중…" : "지금 보내기"}
+          </button>
+        </div>
+        {csPreview ? (
+          <>
+            <p className="sub">
+              {csPreview.dateKst} · 전송 {csPreview.sent} · 건너뜀 {csPreview.skipped}
+              {csPreview.dryRun ? " · 미리보기" : ""}
+              {csPreview.weekend ? " · 주말" : ""}
+              {csPreview.errors.length ? ` · 오류 ${csPreview.errors.length}` : ""}
+            </p>
+            {csPreview.errors.length ? (
+              <ul className="sub">
+                {csPreview.errors.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="table-wrap">
+              <table className="tasks">
+                <thead>
+                  <tr>
+                    <th>종류</th>
+                    <th>수신</th>
+                    <th>서비스</th>
+                    <th>건수</th>
+                    <th>결과</th>
+                    <th>예시</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {csPreview.preview.map((row, index) => (
+                    <tr key={`${row.kind}-${row.recipientUid}-${row.service}-${index}`}>
+                      <td>미해결 CS</td>
                       <td>{row.recipientName || row.recipientUid || "—"}</td>
                       <td>{row.service}</td>
                       <td>{row.taskCount}</td>

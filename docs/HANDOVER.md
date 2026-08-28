@@ -20,6 +20,7 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 | 내 업무 `/my` | 프로필에 저장한 노션 담당자 이름의 작업만. 목록·월력·주력 | 부하와 같은 권한 (`canDashboard`). 이름이 없으면 `/profile` |
 | 부하 / 월력 / 주력 | 담당자별 주간·일간 부하. 일정승인과 같은 본부 칩, 본부 선택 시 팀 칩 | 슈퍼관리자: 전사. 본부장·팀장: 자기 본부. 팀원: 본인 (`canDashboard`) |
 | 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같음. **본부 단위로 격리**. 팀원 API는 본인 작업만 |
+| CS `/cs` | 노션 CS DB. 서비스 칩, 기본 미해결, 목록에서 상태 저장 | 부하와 같은 `canDashboard`. **본부 격리 없음** |
 | 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자·본부장 또는 허용된 계정 |
 | 권한 `/admin/access` | 조직 트리·역할(본부장/팀장/팀원)·페이지 권한 | **슈퍼관리자·본부장** (`shlim@sevensplit.com`은 전사) |
 | 변경 기록 `/changelog` | 배포된 기능을 날짜 칩으로 보기. git log를 빌드 때 묶음 | 로그인한 `@sevensplit.com` 또는 테스트 계정 |
@@ -134,6 +135,13 @@ npm run dev   # next dev --turbopack
 | `lib/sessionCookie.ts` | `wbs_token` 쿠키. 예전 `__session`은 지움 |
 | `lib/firebase.ts` | 클라이언트 Firebase 앱 |
 | `lib/notion.ts` | Notion query + 속성 매핑 |
+| `lib/cs.ts` | CS 미해결 판정 |
+| `lib/csNotion.ts` | CS 노션 읽기·상태 쓰기 |
+| `lib/csAlerts.ts` | CS 평일 11:00 Slack DM. 주말 없음 |
+| `app/cs/page.tsx` | CS 대시보드 |
+| `components/CsBoard.tsx` | 서비스·상태 칩, 미해결 기본, 상태 저장 |
+| `app/api/cs/route.ts` | CS 목록 |
+| `app/api/cs/[id]/route.ts` | CS 상태 PATCH |
 | `lib/metrics.ts` | 잔여 공수, 주간 부하, 용량 |
 | `lib/calendar.ts` | 캘린더 레이아웃 |
 | `app/performance/page.tsx` | 완료 작업 성과. ACL 필요 |
@@ -271,9 +279,11 @@ webframeworks는 Next를 Cloud Function으로 감쌉니다. 정적 호스팅만�
 
 이미 있는 GitHub Secrets:
 
-- `FIREBASE_SERVICE_ACCOUNT`
 - `NOTION_TOKEN`
 - `NOTION_DATABASE_ID`
+- (선택) `NOTION_CS_DATABASE_ID` — 없으면 기본 CS DB UUID
+- `SLACK_BOT_TOKEN` (WBS·CS 알림)
+- `WBS_TEST_PASSWORD` (테스트 로그인 칸)
 
 첫 CD가 이 handover 커밋의 푸시입니다. Actions 탭에서 실패하면 서비스 계정 IAM(Hosting Admin, Functions Admin, Service Account User, Cloud Run 등)과 Secret 값을 먼저 보세요.
 

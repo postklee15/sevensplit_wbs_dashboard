@@ -37,3 +37,11 @@ Slack 앱 스코프: `chat:write`, `im:write`, `users:read.email`. **App Home �
 제약: `firebase-admin` 없음. 쿠키 `wbs_token`. CD `--only auth` 금지.
 
 공유 로직: `lib/alerts.ts`. 크론: `scripts/run-alerts.ts`, `.github/workflows/alerts.yml`.
+
+## CS 미해결 (별 크론)
+
+- 노션 CS DB `NOTION_CS_DATABASE_ID` (기본 `2aa1559b-095a-8098-b648-f7e7769c49a2`). 같은 `NOTION_TOKEN`.
+- 상태가 미해결인 행만. 서비스별 `csOwners`(담당자 또는 담당팀 전원).
+- **평일 11:00 KST** (`0 2 * * 1-5`). **주말에는 보내지 않음** (크론 + 코드 가드).
+- 한 사람당 하루 1통. `alertLogs` kind `cs-unresolved`.
+- 권한 화면 CS 담당·미리보기. `lib/csAlerts.ts`, `scripts/run-cs-alerts.ts`, `.github/workflows/cs-alerts.yml`.

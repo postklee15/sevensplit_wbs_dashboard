@@ -36,6 +36,11 @@ export function SiteNav({
             일정승인
           </Link>
         ) : null}
+        {profile.canDashboard ? (
+          <Link className={`chip ${pathname === "/cs" ? "on" : ""}`} href="/cs">
+            CS
+          </Link>
+        ) : null}
         {profile.canPerformance ? (
           <Link className={`chip ${pathname === "/performance" ? "on" : ""}`} href="/performance">
             성과

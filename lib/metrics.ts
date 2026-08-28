@@ -28,6 +28,17 @@ export function todayKst(): string {
   return new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Seoul" });
 }
 
+/** KST 달력 기준 요일. 0=일 … 6=토. `ymd`는 `YYYY-MM-DD`. */
+export function weekdayKst(ymd = todayKst()): number {
+  const [year, month, day] = ymd.split("-").map(Number);
+  return new Date(Date.UTC(year, month - 1, day)).getUTCDay();
+}
+
+export function isWeekendKst(ymd = todayKst()): boolean {
+  const weekday = weekdayKst(ymd);
+  return weekday === 0 || weekday === 6;
+}
+
 export function parseYmd(value: string): Date {
   const [y, m, d] = value.split("-").map(Number);
   return new Date(y, m - 1, d);

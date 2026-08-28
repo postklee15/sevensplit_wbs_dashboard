@@ -105,6 +105,11 @@ export function canOpenPage(profile: AccessProfile, page: PageKey): boolean {
   return resolved.canPerformance;
 }
 
+/** CS 목록 보기·상태 저장. 부하와 같은 `canDashboard`. 본부 격리 없음. */
+export function canUseCs(profile: AccessProfile): boolean {
+  return canOpenPage(profile, "dashboard");
+}
+
 /** 권한·조직 화면. 이메일 슈퍼관리자·본부장. */
 export function canManageAccess(profile: AccessProfile): boolean {
   const resolved = applyDirectorDefaults(profile);

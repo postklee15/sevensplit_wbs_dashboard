@@ -125,3 +125,27 @@ export type DashboardPayload = {
     members: OrgMember[];
   };
 };
+
+export type CsItem = {
+  id: string;
+  title: string;
+  url: string;
+  service: string | null;
+  status: string | null;
+  receivedAt: string | null;
+  assignees: string[];
+};
+
+export type CsSchema = {
+  statusProperty: string | null;
+  statusType: string | null;
+  statusOptions: string[];
+  writable: boolean;
+};
+
+export type CsPayload = {
+  fetchedAt: string;
+  databaseTitle: string;
+  items: CsItem[];
+  schema: CsSchema;
+};

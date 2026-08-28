@@ -1557,6 +1557,33 @@ table.tasks tbody.task-family tr.task-family-child.unassigned-task td {
   width: 72%;
 }
 
+.access-cs col.col-service {
+  width: 28%;
+}
+
+.access-cs col.col-cs-kind {
+  width: 22%;
+}
+
+.access-cs col.col-pm {
+  width: 50%;
+}
+
+.cs-status-select {
+  min-width: 7.5rem;
+  max-width: 11rem;
+}
+
+.chip .count {
+  margin-left: 4px;
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+}
+
+.chip.on .count {
+  color: inherit;
+}
+
 .access-pm th,
 .access-pm td {
   vertical-align: middle;
