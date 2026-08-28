@@ -1,7 +1,7 @@
 import { isUnresolvedCs } from "./cs";
 import { isNotionPageId, normalizeNotionId } from "./notionIds";
 import { PatchError } from "./notionWrite";
-import type { CsItem, CsSchema } from "./types";
+import type { CsFieldSchema, CsItem, CsPatch, CsSchema, CsTextFieldKey } from "./types";
 
 export const DEFAULT_CS_DATABASE_ID = "2aa1559b-095a-8098-b648-f7e7769c49a2";
 
@@ -10,7 +10,13 @@ const SERVICE_NAMES = ["서비스", "제품", "프로젝트", "Service"];
 const STATUS_NAMES = ["상태", "Status"];
 const DATE_NAMES = ["접수일", "문의일", "생성일", "등록일", "Date"];
 const ASSIGNEE_NAMES = ["담당자", "담당", "Assignee"];
+const BODY_NAMES = ["문의내용", "문의 내용", "내용", "설명", "내용/이슈", "Description"];
+const ANSWER_NAMES = ["답변", "답변내용", "답변 내용", "회신", "Answer", "Response"];
+const NOTE_NAMES = ["비고", "메모", "참고", "Note", "Remark"];
+const FEEDBACK_NAMES = ["피드백", "Feedback"];
 const WRITABLE_STATUS = new Set(["status", "select"]);
+const WRITABLE_TEXT = new Set(["rich_text", "select", "status"]);
+const RICH_TEXT_CHUNK = 2000;
 
 type NotionRichText = { plain_text?: string };
 type NotionPerson = { id?: string; name?: string };
@@ -86,6 +92,13 @@ function selectName(prop: NotionProperty | undefined): string | null {
   return formula || null;
 }
 
+function textValue(prop: NotionProperty | undefined): string {
+  if (!prop) return "";
+  if (prop.type === "rich_text" || prop.rich_text) return plain(prop.rich_text);
+  if (prop.type === "title" || prop.title) return plain(prop.title);
+  return selectName(prop) ?? "";
+}
+
 function peopleNames(prop: NotionProperty | undefined): string[] {
   const names: string[] = [];
   const seen = new Set<string>();
@@ -98,7 +111,11 @@ function peopleNames(prop: NotionProperty | undefined): string[] {
   return names;
 }
 
-function optionNames(prop: NotionProperty | { select?: { options?: Array<{ name?: string }> }; status?: { options?: Array<{ name?: string }> } }): string[] {
+function optionNames(
+  prop:
+    | NotionProperty
+    | { select?: { options?: Array<{ name?: string }> }; status?: { options?: Array<{ name?: string }> } },
+): string[] {
   const selectOpts = (prop as { select?: { options?: Array<{ name?: string }> } | NotionSelect }).select;
   const statusOpts = (prop as { status?: { options?: Array<{ name?: string }> } | NotionSelect }).status;
   const raw =
@@ -114,6 +131,31 @@ function optionNames(prop: NotionProperty | { select?: { options?: Array<{ name?
     names.push(name);
   }
   return names;
+}
+
+function fieldSchema(found: { name: string; prop: NotionProperty } | undefined): CsFieldSchema | undefined {
+  if (!found) return undefined;
+  const type = found.prop.type ?? "";
+  if (!type) return undefined;
+  return {
+    property: found.name,
+    type,
+    options: optionNames(found.prop),
+    writable: WRITABLE_TEXT.has(type),
+  };
+}
+
+function richTextChunks(value: string): Array<{ type: "text"; text: { content: string } }> {
+  if (!value) return [];
+  const chunks: Array<{ type: "text"; text: { content: string } }> = [];
+  for (let i = 0; i < value.length; i += RICH_TEXT_CHUNK) {
+    chunks.push({ type: "text", text: { content: value.slice(i, i + RICH_TEXT_CHUNK) } });
+  }
+  return chunks;
+}
+
+function hasKey<K extends keyof CsPatch>(patch: CsPatch, key: K): boolean {
+  return Object.prototype.hasOwnProperty.call(patch, key);
 }
 
 export function getCsDatabaseId(): string {
@@ -163,16 +205,24 @@ type DbJson = {
 };
 
 export function buildCsSchema(properties: Record<string, unknown>): CsSchema {
-  const status =
-    pickProp(properties as Record<string, NotionProperty>, STATUS_NAMES) ??
-    firstOfType(properties as Record<string, NotionProperty>, "status");
+  const props = properties as Record<string, NotionProperty>;
+  const status = pickProp(props, STATUS_NAMES) ?? firstOfType(props, "status");
   const type = status?.prop.type ?? null;
-  const writable = Boolean(type && WRITABLE_STATUS.has(type));
+  const fields: CsSchema["fields"] = {};
+  const body = fieldSchema(pickProp(props, BODY_NAMES));
+  const answer = fieldSchema(pickProp(props, ANSWER_NAMES));
+  const note = fieldSchema(pickProp(props, NOTE_NAMES));
+  const feedback = fieldSchema(pickProp(props, FEEDBACK_NAMES));
+  if (body && body.type !== "title") fields.body = body;
+  if (answer) fields.answer = answer;
+  if (note) fields.note = note;
+  if (feedback) fields.feedback = feedback;
   return {
     statusProperty: status?.name ?? null,
     statusType: type,
     statusOptions: status ? optionNames(status.prop) : [],
-    writable,
+    writable: Boolean(type && WRITABLE_STATUS.has(type)),
+    fields,
   };
 }
 
@@ -210,6 +260,8 @@ export function parseCsItem(page: CsNotionPage): CsItem | null {
     firstOfType(props, "date")?.prop ??
     firstOfType(props, "created_time")?.prop;
   const received = ymd(dateProp?.date?.start) ?? ymd(dateProp?.created_time) ?? ymd(page.created_time);
+  const bodyProp = pickProp(props, BODY_NAMES);
+  const body = bodyProp?.prop.type === "title" ? "" : textValue(bodyProp?.prop);
   return {
     id: page.id,
     title: title || "(제목 없음)",
@@ -218,6 +270,10 @@ export function parseCsItem(page: CsNotionPage): CsItem | null {
     status,
     receivedAt: received,
     assignees: peopleNames(pickProp(props, ASSIGNEE_NAMES)?.prop),
+    body,
+    answer: textValue(pickProp(props, ANSWER_NAMES)?.prop),
+    note: textValue(pickProp(props, NOTE_NAMES)?.prop),
+    feedback: textValue(pickProp(props, FEEDBACK_NAMES)?.prop),
   };
 }
 
@@ -296,30 +352,76 @@ export async function fetchCsPage(pageId: string): Promise<{ item: CsItem; inDat
   };
 }
 
-export async function patchCsStatus(pageId: string, status: string, schema: CsSchema): Promise<CsItem> {
+function writeTextProperty(field: CsFieldSchema, value: string, label: string): Record<string, unknown> {
+  if (field.type === "rich_text") return { rich_text: richTextChunks(value) };
+  if (field.type === "select") {
+    if (!value) return { select: null };
+    if (field.options.length > 0 && !field.options.includes(value)) {
+      throw new PatchError(`${label} 값이 노션 옵션에 없습니다.`, 400);
+    }
+    return { select: { name: value } };
+  }
+  if (field.type === "status") {
+    if (!value) throw new PatchError(`${label}은(는) 비울 수 없습니다.`, 400);
+    if (field.options.length > 0 && !field.options.includes(value)) {
+      throw new PatchError(`${label} 값이 노션 옵션에 없습니다.`, 400);
+    }
+    return { status: { name: value } };
+  }
+  throw new PatchError(`${label}은(는) 앱에서 수정할 수 없는 속성입니다.`, 400);
+}
+
+function requireTextField(schema: CsSchema, key: CsTextFieldKey, label: string): CsFieldSchema {
+  const field = schema.fields[key];
+  if (!field) throw new PatchError(`노션에 ${label} 속성이 없습니다.`, 400);
+  if (!field.writable) throw new PatchError(`${label}은(는) 앱에서 수정할 수 없는 속성입니다.`, 400);
+  return field;
+}
+
+export async function patchCsItem(pageId: string, patch: CsPatch, schema: CsSchema): Promise<CsItem> {
   if (!isNotionPageId(pageId)) {
     throw new PatchError("페이지 ID가 올바르지 않습니다.", 400);
   }
-  const name = status.trim();
-  if (!name) throw new PatchError("상태를 비울 수 없습니다.", 400);
-  if (!schema.statusProperty || !schema.statusType) {
-    throw new PatchError("노션에 상태 속성이 없습니다.", 400);
+  const properties: Record<string, unknown> = {};
+
+  if (hasKey(patch, "status")) {
+    const name = (patch.status ?? "").trim();
+    if (!name) throw new PatchError("상태를 비울 수 없습니다.", 400);
+    if (!schema.statusProperty || !schema.statusType) {
+      throw new PatchError("노션에 상태 속성이 없습니다.", 400);
+    }
+    if (!schema.writable) {
+      throw new PatchError("상태는 앱에서 수정할 수 없는 속성입니다.", 400);
+    }
+    if (schema.statusOptions.length > 0 && !schema.statusOptions.includes(name)) {
+      throw new PatchError("상태 값이 노션 옵션에 없습니다.", 400);
+    }
+    properties[schema.statusProperty] =
+      schema.statusType === "status" ? { status: { name } } : { select: { name } };
   }
-  if (!schema.writable) {
-    throw new PatchError("상태는 앱에서 수정할 수 없는 속성입니다.", 400);
+
+  const texts: Array<{ key: "answer" | "note" | "feedback"; label: string }> = [
+    { key: "answer", label: "답변" },
+    { key: "note", label: "비고" },
+    { key: "feedback", label: "피드백" },
+  ];
+  for (const { key, label } of texts) {
+    if (!hasKey(patch, key)) continue;
+    const field = requireTextField(schema, key, label);
+    const raw = patch[key];
+    const value = raw == null ? "" : String(raw);
+    properties[field.property] = writeTextProperty(field, value, label);
   }
-  if (schema.statusOptions.length > 0 && !schema.statusOptions.includes(name)) {
-    throw new PatchError("상태 값이 노션 옵션에 없습니다.", 400);
+
+  if (Object.keys(properties).length === 0) {
+    throw new PatchError("바꿀 항목이 없습니다.", 400);
   }
-  const property =
-    schema.statusType === "status" ? { status: { name } } : { select: { name } };
+
   const { headers } = getCsNotionConfig();
   const res = await fetch(`https://api.notion.com/v1/pages/${pageId}`, {
     method: "PATCH",
     headers,
-    body: JSON.stringify({
-      properties: { [schema.statusProperty]: property },
-    }),
+    body: JSON.stringify({ properties }),
     cache: "no-store",
   });
   if (!res.ok) {
@@ -340,4 +442,8 @@ export async function patchCsStatus(pageId: string, status: string, schema: CsSc
   const item = parseCsItem(page);
   if (!item) throw new PatchError("저장 결과를 읽지 못했습니다.", 502);
   return item;
+}
+
+export async function patchCsStatus(pageId: string, status: string, schema: CsSchema): Promise<CsItem> {
+  return patchCsItem(pageId, { status }, schema);
 }

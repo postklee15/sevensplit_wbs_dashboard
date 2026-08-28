@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isUnresolvedCs, NO_CS_SERVICE, servicesOfCs, statusesOfCs, unresolvedCount } from "@/lib/cs";
 import { pageSlice } from "@/lib/pager";
 import type { CsItem, CsPayload } from "@/lib/types";
+import { CsDetail } from "@/components/CsDetail";
 import { Pager, PageSizeSelect } from "@/components/Pager";
 
 type StatusFilter = "unresolved" | "all" | string;
@@ -16,7 +17,8 @@ function fmtReceived(ymd: string | null): string {
 function matchesQuery(item: CsItem, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
-  const hay = `${item.title} ${item.service ?? ""} ${item.status ?? ""} ${item.assignees.join(" ")}`.toLowerCase();
+  const hay =
+    `${item.title} ${item.service ?? ""} ${item.status ?? ""} ${item.assignees.join(" ")} ${item.body} ${item.answer} ${item.note} ${item.feedback}`.toLowerCase();
   return hay.includes(q);
 }
 
@@ -30,6 +32,7 @@ export function CsBoard({ token }: { token: string }) {
   const [pageSize, setPageSize] = useState(20);
   const [page, setPage] = useState(1);
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<CsItem | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -111,23 +114,29 @@ export function CsBoard({ token }: { token: string }) {
           Authorization: `Bearer ${token}`,
           "Content-Type": "application/json",
         },
+        credentials: "include",
         body: JSON.stringify({ status: next }),
       });
       const body = (await res.json()) as { item?: CsItem; error?: string };
       if (!res.ok || !body.item) throw new Error(body.error || "상태 저장 실패");
-      setPayload((prev) =>
-        prev
-          ? {
-              ...prev,
-              items: prev.items.map((row) => (row.id === item.id ? body.item! : row)),
-            }
-          : prev,
-      );
+      applySaved(body.item);
     } catch (err) {
       setError(err instanceof Error ? err.message : "상태를 저장하지 못했습니다.");
     } finally {
       setSavingId(null);
     }
+  }
+
+  function applySaved(next: CsItem) {
+    setPayload((prev) =>
+      prev
+        ? {
+            ...prev,
+            items: prev.items.map((row) => (row.id === next.id ? next : row)),
+          }
+        : prev,
+    );
+    setSelected((prev) => (prev && prev.id === next.id ? next : prev));
   }
 
   const serviceChips = useMemo(() => {
@@ -145,13 +154,13 @@ export function CsBoard({ token }: { token: string }) {
           <p className="kicker">Split Invest · {payload?.databaseTitle ?? "CS"}</p>
           <h1>CS</h1>
           <p className="sub">
-            미해결 문의를 기본으로 봅니다. 상태는 목록에서 바로 저장됩니다.
+            미해결 문의를 기본으로 봅니다. 제목을 누르면 상세에서 답변·비고·피드백을 저장합니다.
             {fetched ? ` · ${fetched} 동기화` : ""}
           </p>
         </div>
         <div className="controls">
           <input
-            placeholder="제목, 서비스, 상태, 담당 검색"
+            placeholder="제목, 문의, 답변, 비고, 피드백 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />
@@ -288,13 +297,12 @@ export function CsBoard({ token }: { token: string }) {
                         </td>
                         <td className="col-service">{item.service ?? "—"}</td>
                         <td>
-                          {item.url ? (
-                            <a className="title-link" href={item.url} target="_blank" rel="noreferrer">
-                              {item.title}
-                            </a>
-                          ) : (
-                            <span className="title-link">{item.title}</span>
-                          )}
+                          <button className="title-link" type="button" onClick={() => setSelected(item)}>
+                            {item.title}
+                          </button>
+                          {item.body.trim() ? (
+                            <div className="issue">{item.body.trim().slice(0, 120)}</div>
+                          ) : null}
                         </td>
                         <td className="col-assignee">{fmtReceived(item.receivedAt)}</td>
                         <td className="col-assignee">{item.assignees.join(", ") || "—"}</td>
@@ -316,6 +324,17 @@ export function CsBoard({ token }: { token: string }) {
             />
           ) : null}
         </section>
+      ) : null}
+
+      {selected && payload ? (
+        <CsDetail
+          key={selected.id}
+          item={selected}
+          schema={payload.schema}
+          token={token}
+          onClose={() => setSelected(null)}
+          onSaved={applySaved}
+        />
       ) : null}
     </main>
   );

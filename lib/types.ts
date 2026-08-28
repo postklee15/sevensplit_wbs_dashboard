@@ -134,6 +134,20 @@ export type CsItem = {
   status: string | null;
   receivedAt: string | null;
   assignees: string[];
+  /** 문의 본문. 있으면 상세에서 읽기만. */
+  body: string;
+  answer: string;
+  note: string;
+  feedback: string;
+};
+
+export type CsTextFieldKey = "body" | "answer" | "note" | "feedback";
+
+export type CsFieldSchema = {
+  property: string;
+  type: string;
+  options: string[];
+  writable: boolean;
 };
 
 export type CsSchema = {
@@ -141,6 +155,14 @@ export type CsSchema = {
   statusType: string | null;
   statusOptions: string[];
   writable: boolean;
+  fields: Partial<Record<CsTextFieldKey, CsFieldSchema>>;
+};
+
+export type CsPatch = {
+  status?: string;
+  answer?: string | null;
+  note?: string | null;
+  feedback?: string | null;
 };
 
 export type CsPayload = {
