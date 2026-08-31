@@ -11,9 +11,11 @@ const STATUS_NAMES = ["상태", "Status"];
 const DATE_NAMES = ["접수일", "문의일", "생성일", "등록일", "Date"];
 const ASSIGNEE_NAMES = ["담당자", "담당", "Assignee"];
 const CUSTOMER_NAMES = [
+  "고객명/닉네임",
   "고객명",
   "고객 이름",
   "고객이름",
+  "닉네임",
   "고객",
   "문의자",
   "작성자",
@@ -22,6 +24,19 @@ const CUSTOMER_NAMES = [
   "Customer",
   "Customer name",
   "Client",
+];
+const LOGIN_NAMES = [
+  "아이디",
+  "계정아이디",
+  "계정 아이디",
+  "로그인 아이디",
+  "로그인아이디",
+  "유저아이디",
+  "계정",
+  "ID",
+  "User ID",
+  "Username",
+  "Login",
 ];
 const BODY_NAMES = ["문의내용", "문의 내용", "내용", "설명", "내용/이슈", "Description"];
 const ANSWER_NAMES = ["답변", "답변내용", "답변 내용", "회신", "Answer", "Response"];
@@ -122,6 +137,16 @@ function namedValue(prop: NotionProperty | undefined): string | null {
   if (typeof prop.phone_number === "string" && prop.phone_number.trim()) return prop.phone_number.trim();
   const text = textValue(prop).trim();
   return text || null;
+}
+
+function readNamed(
+  props: Record<string, NotionProperty>,
+  names: string[],
+  titleName: string | undefined,
+): string | null {
+  const found = pickProp(props, names);
+  if (!found || found.name === titleName) return null;
+  return namedValue(found.prop);
 }
 
 function peopleNames(prop: NotionProperty | undefined): string[] {
@@ -287,9 +312,8 @@ export function parseCsItem(page: CsNotionPage): CsItem | null {
   const received = ymd(dateProp?.date?.start) ?? ymd(dateProp?.created_time) ?? ymd(page.created_time);
   const bodyProp = pickProp(props, BODY_NAMES);
   const body = bodyProp?.prop.type === "title" ? "" : textValue(bodyProp?.prop);
-  const customerFound = pickProp(props, CUSTOMER_NAMES);
-  const customerName =
-    customerFound && customerFound.name !== titleProp?.name ? namedValue(customerFound.prop) : null;
+  const customerName = readNamed(props, CUSTOMER_NAMES, titleProp?.name);
+  const loginId = readNamed(props, LOGIN_NAMES, titleProp?.name);
   return {
     id: page.id,
     title: title || "(제목 없음)",
@@ -299,6 +323,7 @@ export function parseCsItem(page: CsNotionPage): CsItem | null {
     receivedAt: received,
     assignees: peopleNames(pickProp(props, ASSIGNEE_NAMES)?.prop),
     customerName,
+    loginId,
     body,
     answer: textValue(pickProp(props, ANSWER_NAMES)?.prop),
     note: textValue(pickProp(props, NOTE_NAMES)?.prop),

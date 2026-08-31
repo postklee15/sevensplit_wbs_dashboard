@@ -18,7 +18,7 @@ function matchesQuery(item: CsItem, query: string): boolean {
   const q = query.trim().toLowerCase();
   if (!q) return true;
   const hay =
-    `${item.title} ${item.customerName ?? ""} ${item.service ?? ""} ${item.status ?? ""} ${item.assignees.join(" ")} ${item.body} ${item.answer} ${item.note} ${item.feedback}`.toLowerCase();
+    `${item.title} ${item.customerName ?? ""} ${item.loginId ?? ""} ${item.service ?? ""} ${item.status ?? ""} ${item.assignees.join(" ")} ${item.body} ${item.answer} ${item.note} ${item.feedback}`.toLowerCase();
   return hay.includes(q);
 }
 
@@ -160,7 +160,7 @@ export function CsBoard({ token }: { token: string }) {
         </div>
         <div className="controls">
           <input
-            placeholder="제목, 고객명, 문의, 답변, 비고, 피드백 검색"
+            placeholder="제목, 고객명, 아이디, 문의, 답변, 비고, 피드백 검색"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
           />

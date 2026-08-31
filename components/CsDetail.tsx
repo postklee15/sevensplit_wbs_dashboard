@@ -41,6 +41,7 @@ function ItemFields({ item, status }: { item: CsItem; status?: ReactNode }) {
       {status ? <Field label="상태">{status}</Field> : null}
       <Field label="서비스">{item.service ?? "—"}</Field>
       <Field label="고객명">{item.customerName?.trim() || "—"}</Field>
+      <Field label="아이디">{item.loginId?.trim() || "—"}</Field>
       <Field label="접수">{item.receivedAt ?? "—"}</Field>
       <Field label="담당">{item.assignees.join(", ") || "—"}</Field>
     </dl>

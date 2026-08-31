@@ -134,8 +134,10 @@ export type CsItem = {
   status: string | null;
   receivedAt: string | null;
   assignees: string[];
-  /** 노션 고객명. 없으면 null. 상세에서 읽기만. */
+  /** 노션 고객명/닉네임. 없으면 null. 상세에서 읽기만. */
   customerName: string | null;
+  /** 노션 아이디. 없으면 null. 상세에서 읽기만. */
+  loginId: string | null;
   /** 문의 본문. 있으면 상세에서 읽기만. */
   body: string;
   answer: string;
