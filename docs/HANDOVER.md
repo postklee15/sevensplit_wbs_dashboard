@@ -20,7 +20,7 @@ Notion **WBS & Gantt** 데이터베이스를 읽어, `@sevensplit.com` 구성원
 | 내 업무 `/my` | 프로필에 저장한 노션 담당자 이름의 작업만. 목록·월력·주력 | 부하와 같은 권한 (`canDashboard`). 이름이 없으면 `/profile` |
 | 부하 / 월력 / 주력 | 담당자별 주간·일간 부하. 일정승인과 같은 본부 칩, 본부 선택 시 팀 칩 | 슈퍼관리자: 전사. 본부장·팀장: 자기 본부. 팀원: 본인 (`canDashboard`) |
 | 일정승인 `/approval` | 일정승인 미지정·승인·반려·보류 | 부하와 같음. **본부 단위로 격리**. 팀원 API는 본인 작업만 |
-| CS `/cs` | 노션 CS DB. 서비스 칩, 기본 미해결, 제목→상세에서 상태·답변·비고·피드백 저장 | 부하와 같은 `canDashboard`. **본부 격리 없음** |
+| CS `/cs` | 노션 CS DB. 서비스 칩, 기본 미해결, 제목→상세에서 고객명·상태·답변·비고·피드백 | 부하와 같은 `canDashboard`. **본부 격리 없음** |
 | 성과 `/performance` | 완료 작업 기준 인원별 성과 | 슈퍼관리자·본부장 또는 허용된 계정 |
 | 권한 `/admin/access` | 조직 트리·역할(본부장/팀장/팀원)·페이지 권한 | **슈퍼관리자·본부장** (`shlim@sevensplit.com`은 전사) |
 | 변경 기록 `/changelog` | 배포된 기능을 날짜 칩으로 보기. git log를 빌드 때 묶음 | 로그인한 `@sevensplit.com` 또는 테스트 계정 |
@@ -140,7 +140,7 @@ npm run dev   # next dev --turbopack
 | `lib/csAlerts.ts` | CS 평일 11:00 Slack DM. 주말 없음 |
 | `app/cs/page.tsx` | CS 대시보드 |
 | `components/CsBoard.tsx` | 서비스·상태 칩, 미해결 기본, 제목→상세 |
-| `components/CsDetail.tsx` | CS 상세. 문의내용 읽기, 답변·비고·피드백·상태 저장 |
+| `components/CsDetail.tsx` | CS 상세. 고객명·문의내용 읽기, 답변·비고·피드백·상태 저장 |
 | `app/api/cs/route.ts` | CS 목록 |
 | `app/api/cs/[id]/route.ts` | CS GET·PATCH `{ status, answer, note, feedback }` |
 | `lib/metrics.ts` | 잔여 공수, 주간 부하, 용량 |

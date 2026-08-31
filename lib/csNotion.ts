@@ -10,6 +10,19 @@ const SERVICE_NAMES = ["서비스", "제품", "프로젝트", "Service"];
 const STATUS_NAMES = ["상태", "Status"];
 const DATE_NAMES = ["접수일", "문의일", "생성일", "등록일", "Date"];
 const ASSIGNEE_NAMES = ["담당자", "담당", "Assignee"];
+const CUSTOMER_NAMES = [
+  "고객명",
+  "고객 이름",
+  "고객이름",
+  "고객",
+  "문의자",
+  "작성자",
+  "회원명",
+  "회원",
+  "Customer",
+  "Customer name",
+  "Client",
+];
 const BODY_NAMES = ["문의내용", "문의 내용", "내용", "설명", "내용/이슈", "Description"];
 const ANSWER_NAMES = ["답변", "답변내용", "답변 내용", "회신", "Answer", "Response"];
 const NOTE_NAMES = ["비고", "메모", "참고", "Note", "Remark"];
@@ -33,6 +46,8 @@ type NotionProperty = {
   date?: NotionDate;
   created_time?: string;
   formula?: { type?: string; string?: string | null };
+  email?: string | null;
+  phone_number?: string | null;
 };
 
 type CsNotionPage = {
@@ -97,6 +112,16 @@ function textValue(prop: NotionProperty | undefined): string {
   if (prop.type === "rich_text" || prop.rich_text) return plain(prop.rich_text);
   if (prop.type === "title" || prop.title) return plain(prop.title);
   return selectName(prop) ?? "";
+}
+
+function namedValue(prop: NotionProperty | undefined): string | null {
+  if (!prop) return null;
+  const people = peopleNames(prop);
+  if (people.length) return people.join(", ");
+  if (typeof prop.email === "string" && prop.email.trim()) return prop.email.trim();
+  if (typeof prop.phone_number === "string" && prop.phone_number.trim()) return prop.phone_number.trim();
+  const text = textValue(prop).trim();
+  return text || null;
 }
 
 function peopleNames(prop: NotionProperty | undefined): string[] {
@@ -262,6 +287,9 @@ export function parseCsItem(page: CsNotionPage): CsItem | null {
   const received = ymd(dateProp?.date?.start) ?? ymd(dateProp?.created_time) ?? ymd(page.created_time);
   const bodyProp = pickProp(props, BODY_NAMES);
   const body = bodyProp?.prop.type === "title" ? "" : textValue(bodyProp?.prop);
+  const customerFound = pickProp(props, CUSTOMER_NAMES);
+  const customerName =
+    customerFound && customerFound.name !== titleProp?.name ? namedValue(customerFound.prop) : null;
   return {
     id: page.id,
     title: title || "(제목 없음)",
@@ -270,6 +298,7 @@ export function parseCsItem(page: CsNotionPage): CsItem | null {
     status,
     receivedAt: received,
     assignees: peopleNames(pickProp(props, ASSIGNEE_NAMES)?.prop),
+    customerName,
     body,
     answer: textValue(pickProp(props, ANSWER_NAMES)?.prop),
     note: textValue(pickProp(props, NOTE_NAMES)?.prop),

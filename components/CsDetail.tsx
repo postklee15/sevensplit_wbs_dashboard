@@ -35,6 +35,18 @@ function Field({ label, children }: { label: string; children: ReactNode }) {
   );
 }
 
+function ItemFields({ item, status }: { item: CsItem; status?: ReactNode }) {
+  return (
+    <dl className="task-detail-grid">
+      {status ? <Field label="상태">{status}</Field> : null}
+      <Field label="서비스">{item.service ?? "—"}</Field>
+      <Field label="고객명">{item.customerName?.trim() || "—"}</Field>
+      <Field label="접수">{item.receivedAt ?? "—"}</Field>
+      <Field label="담당">{item.assignees.join(", ") || "—"}</Field>
+    </dl>
+  );
+}
+
 function canWriteTexts(schema: CsSchema): boolean {
   return TEXT_FIELDS.some(({ key }) => schema.fields[key]?.writable);
 }
@@ -219,9 +231,10 @@ export function CsDetail({
 
         {canEdit ? (
           <form className="task-detail-form" onSubmit={(event) => void onSave(event)}>
-            <dl className="task-detail-grid">
-              <Field label="상태">
-                {schema.writable && statusOptions.length > 0 ? (
+            <ItemFields
+              item={item}
+              status={
+                schema.writable && statusOptions.length > 0 ? (
                   <select
                     value={draft.status}
                     onChange={(event) => setDraft({ ...draft, status: event.target.value })}
@@ -236,12 +249,9 @@ export function CsDetail({
                   </select>
                 ) : (
                   item.status || "—"
-                )}
-              </Field>
-              <Field label="서비스">{item.service ?? "—"}</Field>
-              <Field label="접수">{item.receivedAt ?? "—"}</Field>
-              <Field label="담당">{item.assignees.join(", ") || "—"}</Field>
-            </dl>
+                )
+              }
+            />
             {showBody ? (
               <section className="task-detail-issue">
                 <h3>문의내용</h3>
@@ -291,11 +301,7 @@ export function CsDetail({
           </form>
         ) : (
           <>
-            <dl className="task-detail-grid">
-              <Field label="서비스">{item.service ?? "—"}</Field>
-              <Field label="접수">{item.receivedAt ?? "—"}</Field>
-              <Field label="담당">{item.assignees.join(", ") || "—"}</Field>
-            </dl>
+            <ItemFields item={item} />
             {showBody ? (
               <section className="task-detail-issue">
                 <h3>문의내용</h3>
